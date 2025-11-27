@@ -1,6 +1,6 @@
-import { SuiClient } from "@mysten/sui.js/client";
-import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
-import { TransactionBlock } from "@mysten/sui.js/transactions";
+import { SuiClient } from "@mysten/sui/client";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { Transaction } from "@mysten/sui/transactions";
 import { configDotenv } from "dotenv";
 configDotenv()
 // Setup
@@ -9,7 +9,7 @@ const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED!); // From `one ke
 const packageId = '0xb3b75e02a830284ee0e905bf8e3c15d88ae5697336bfa1f65b267edf1bf5032d';
 
 async function splitPayment() {
-  const tx = new TransactionBlock();
+  const tx = new Transaction();
   console.log(keypair.toSuiAddress())
   const coins = await clien.getAllCoins({
     owner : keypair.toSuiAddress()
@@ -40,9 +40,9 @@ async function splitPayment() {
   
   
   // Execute
-  const result = await clien.signAndExecuteTransactionBlock({
+  const result = await clien.signAndExecuteTransaction({
     signer: keypair,
-    transactionBlock: tx,
+    transaction: tx,
     
   });
   

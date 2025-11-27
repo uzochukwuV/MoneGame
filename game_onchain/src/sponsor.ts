@@ -1,6 +1,6 @@
-import { SuiClient } from '@mysten/sui.js/client';
-import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { SuiClient } from '@mysten/sui/client';
+import { Transaction } from '@mysten/sui/transactions';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 
 export class GasSponsor {
   private client: SuiClient;
@@ -21,7 +21,7 @@ export class GasSponsor {
    * Sponsor a transaction by providing gas payment
    */
   async sponsorTransaction(
-    tx: TransactionBlock,
+    tx: Transaction,
     userAddress: string
   ): Promise<string> {
     // Set user as sender
@@ -59,7 +59,7 @@ export class GasSponsor {
     const txBytes = await tx.build({ client: this.client });
 
     // Sponsor signs the transaction
-    const sponsorSignature = await this.sponsorKeypair.signTransactionBlock(
+    const sponsorSignature = await this.sponsorKeypair.signTransaction(
       txBytes
     );
 
