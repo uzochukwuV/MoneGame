@@ -6,3 +6,5 @@ https://github.com/uzochukwuV/MoneGame
 
 https://github.com/uzochukwuV/gasless-superapp.git / game_onchain
 
+
+https://mone-game.vercel.app/

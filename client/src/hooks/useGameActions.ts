@@ -41,11 +41,11 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
       console.log('🎟️ Querying tier lobby for tier:', tier);
       const response = await suiClient.queryEvents({
         query: {
-          MoveEventType: `${packageId}::majority_rules::TierLobbyCreated`,
+          MoveEventType: `${packageId}::battle_royale::TierLobbyCreated`,
         } as any,
       });
 
-      console.log('📦 TierLobbyCreated events:', response.data?.length);
+      console.log('📦 GameCreated events:', response.data?.length);
 
       const tierEvent = response.data?.find((event: any) =>
         Number(event.parsedJson?.tier) === tier
@@ -62,26 +62,27 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     [suiClient, packageId]
   );
 
-  const getPlatformTreasury = useCallback(async (): Promise<string> => {
-    console.log('💰 Querying platform treasury...');
-    const objects = await suiClient.getOwnedObjects({
-      owner: packageId,
-      filter: {
-        StructType: `${packageId}::majority_rules::PlatformTreasury`,
-      },
-      options: {
-        showContent: true,
-      },
-    });
+ const getPlatformTreasury = useCallback(async (): Promise<string> => {
+  console.log('💰 Querying platform treasury...');
+  const response = await suiClient.queryEvents({
+    query: {
+      MoveEventType: `${packageId}::battle_royale::PlatformTreasuryCreated`,
+    } as any,
+  });
 
-    if (!objects.data || objects.data.length === 0) {
-      throw new Error('Platform treasury not found');
-    }
+  console.log('📦 PlatformTreasuryCreated events:', response.data?.length);
 
-    const treasuryId = objects.data[0]?.data?.objectId;
-    console.log('✅ Found treasury ID:', treasuryId?.slice(0, 8) + '...');
-    return treasuryId!;
-  }, [suiClient, packageId]);
+  if (!response.data || response.data.length === 0) {
+    throw new Error('Platform treasury not found');
+  }
+
+  // There should only be one platform treasury (created during init)
+  const treasuryEvent = response.data[0] as any;
+  const treasuryId = treasuryEvent.parsedJson?.treasury_id;
+  
+  console.log('✅ Found treasury ID:', treasuryId?.slice(0, 8) + '...');
+  return treasuryId!;
+}, [suiClient, packageId]);
 
   const createGame = useCallback(async (tier: Tier) => {
     if (!currentAccount) {
@@ -101,7 +102,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
 
       // Call create_game with lobby and clock
       tx.moveCall({
-        target: `${packageId}::majority_rules::create_game`,
+        target: `${packageId}::battle_royale::create_game`,
         arguments: [
           tx.object(lobbyId),
           tx.object(CLOCK_OBJECT),
@@ -125,73 +126,75 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     }
   }, [currentAccount, packageId, signAndExecute, getTierLobby]);
 
-  const joinGame = useCallback(async (gameId: string, tier: Tier) => {
-    if (!currentAccount) {
-      throw new Error('Wallet not connected');
-    }
+ const joinGame = useCallback(async (gameId: string, tier: Tier) => {
+  if (!currentAccount) {
+    throw new Error('Wallet not connected');
+  }
 
-    setIsLoading(true);
-    setError(null);
+  setIsLoading(true);
+  setError(null);
 
-    try {
-      console.log('🎮 Joining game:', gameId.slice(0, 8) + '...');
-      const userAddress = currentAccount.address;
+  try {
+    console.log('🎮 Joining game:', gameId.slice(0, 8) + '...');
+    const userAddress = currentAccount.address;
 
-      // Get required objects
-      console.log('📦 Fetching lobby, treasury, and user coins...');
-      const lobbyId = await getTierLobby(tier);
-      const treasuryId = await getPlatformTreasury();
+    // Get required objects
+    console.log('📦 Fetching lobby, treasury, and user coins...');
+    const lobbyId = await getTierLobby(tier);
+    const treasuryId = await getPlatformTreasury();
 
-      // Get user's coins for entry fee
-      const coins = await suiClient.getAllCoins({ owner: userAddress });
-      if (!coins.data || coins.data.length === 0) {
-        throw new Error('User has no coins');
-      }
+    // Get user's OCT coins for entry fee
 
-      console.log('✅ Found user coins:', coins.data.length);
+    const coins = await suiClient.getAllCoins({ 
+      owner: userAddress,
+      
+    });
+    
+   console.log(coins.data)
 
-      // Create transaction
-      const tx = new Transaction();
+    console.log('✅ Found OCT coins:', coins.data.length);
 
-      // Split entry fee from user's first coin
-      const entryFeeMIST = TIER_FEES[tier] * 1_000_000_000; // Convert to MIST
-      console.log('💰 Entry fee:', TIER_FEES[tier], 'OCT =', entryFeeMIST, 'MIST');
+    // Create transaction
+    const tx = new Transaction();
 
-      const paymentCoin = tx.splitCoins(tx.object(coins.data[0]!.coinObjectId), [
-        entryFeeMIST,
-      ])[0];
+    // Split entry fee from user's first coin
+    const entryFeeMIST = TIER_FEES[tier] * 1_000_000_000; // Convert to MIST
+    console.log('💰 Entry fee:', TIER_FEES[tier], 'OCT =', entryFeeMIST, 'MIST');
 
-      console.log('🎯 Split payment coin, calling join_game...');
+    const [paymentCoin] = tx.splitCoins(tx.object(coins.data[0]!.coinObjectId), [
+      entryFeeMIST,
+    ]);
 
-      // Call join_game with all required arguments
-      tx.moveCall({
-        target: `${packageId}::majority_rules::join_game`,
-        arguments: [
-          tx.object(lobbyId),
-          tx.object(gameId),
-          tx.object(treasuryId),
-          paymentCoin!,
-          tx.object(CLOCK_OBJECT),
-        ],
-      });
+    console.log('🎯 Split payment coin, calling join_game...');
 
-      console.log('📤 Executing join game transaction...');
-      const result = await signAndExecute({
-        transaction: tx,
-      });
+    // Call join_game with type argument for OCT
+    tx.moveCall({
+      target: `${packageId}::battle_royale::join_game`,
+      arguments: [
+        tx.object(lobbyId),
+        tx.object(gameId),
+        tx.object(treasuryId),
+        paymentCoin,
+        tx.object(CLOCK_OBJECT),
+      ],
+    });
 
-      console.log('✅ Successfully joined game! Digest:', result.digest);
-      return result.digest;
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to join game';
-      console.error('❌ Join game error:', errorMsg);
-      setError(errorMsg);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentAccount, packageId, signAndExecute, suiClient, getTierLobby, getPlatformTreasury]);
+    console.log('📤 Executing join game transaction...');
+    const result = await signAndExecute({
+      transaction: tx,
+    });
 
+    console.log('✅ Successfully joined game! Digest:', result.digest);
+    return result.digest;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Failed to join game';
+    console.error('❌ Join game error:', errorMsg);
+    setError(errorMsg);
+    throw err;
+  } finally {
+    setIsLoading(false);
+  }
+}, [currentAccount, packageId, signAndExecute, suiClient, getTierLobby, getPlatformTreasury]);
   const askQuestion = useCallback(async (
     gameId: string,
     question: string,
@@ -211,7 +214,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
       const tx = new Transaction();
 
       tx.moveCall({
-        target: `${packageId}::majority_rules::ask_question`,
+        target: `${packageId}::battle_royale::ask_question`,
         arguments: [
           tx.object(gameId),
           tx.pure.string(question),
@@ -248,7 +251,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
       const tx = new Transaction();
 
       tx.moveCall({
-        target: `${packageId}::majority_rules::submit_answer`,
+        target: `${packageId}::battle_royale::submit_answer`,
         arguments: [
           tx.object(gameId),
           tx.pure.u8(choice),
@@ -281,7 +284,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
       const tx = new Transaction();
 
       tx.moveCall({
-        target: `${packageId}::majority_rules::claim_prize`,
+        target: `${packageId}::battle_royale::claim_prize`,
         arguments: [tx.object(gameId)],
       });
 

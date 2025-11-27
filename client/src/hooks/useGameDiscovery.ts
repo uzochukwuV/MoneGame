@@ -27,7 +27,7 @@ interface DiscoveryState {
 
 export function useGameDiscovery({
   packageId = GAME_PACKAGE_ID,
-  refreshInterval = 10000, // 5 seconds
+  refreshInterval = 1000000, // 5 seconds
   autoRefresh = true,
 }: UseGameDiscoveryProps = {}) {
   const suiClient = useSuiClient();
