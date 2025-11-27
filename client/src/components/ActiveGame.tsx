@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { GameInfo, Question, VotingStats } from '../types/game';
-import { Tier, TIER_NAMES } from '../types/game';
+import { Tier, TIER_NAMES, GameStatus } from '../types/game';
 
 interface ActiveGameProps {
   gameInfo: GameInfo;
@@ -110,7 +110,7 @@ export function ActiveGame({
           </div>
         </div>
 
-        {!question && isQuestioner ? (
+        {!question && isQuestioner && gameInfo.status === GameStatus.ACTIVE ? (
           <div className="question-section">
             <div className="questioner-badge">
               &#x2728; You are the Questioner!
@@ -189,21 +189,31 @@ export function ActiveGame({
               </button>
             </div>
           </div>
-        ) : !question ? (
-          <div className="question-section">
-            <div className="loading-dots">
-              <span></span>
-              <span></span>
-              <span></span>
+        ) : !question && gameInfo.status === GameStatus.ACTIVE ? (
+          <div className="question-section pending-question-dialog">
+            <div className="pending-dialog-content">
+              <div className="pending-icon">⏳</div>
+              <h3 className="pending-title">Waiting for Question</h3>
+              <p className="pending-questioner">
+                Questioner: <span className="questioner-address">{gameInfo.currentQuestioner?.slice(0, 12)}...</span>
+              </p>
+              <p className="pending-description">
+                The questioner is preparing a question for this round. Stay tuned!
+              </p>
+              <div className="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <p className="pending-subtitle">
+                Round {gameInfo.currentRound} • {gameInfo.playerCount - gameInfo.eliminatedCount} players remaining
+              </p>
             </div>
-            <p style={{ color: 'var(--text-secondary)', marginTop: '1.5rem' }}>
-              Waiting for the Questioner to submit a question...
-            </p>
           </div>
-        ) : (
+        ) : question ? (
           <div className="question-section">
             <h3 className="question-text">{question.question}</h3>
-            
+
             <div className="options-grid">
               {[
                 { letter: 'A', text: question.optionA, value: 1 as const },
@@ -243,6 +253,12 @@ export function ActiveGame({
                 &#x2714; Answer submitted! Waiting for other players...
               </p>
             )}
+          </div>
+        ) : (
+          <div className="question-section">
+            <p style={{ color: 'var(--text-secondary)', marginTop: '1.5rem' }}>
+              Game is loading...
+            </p>
           </div>
         )}
 

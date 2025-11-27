@@ -35,32 +35,194 @@ function App() {
   // Initialize game actions hook
   const gameActions = useGameActions({ packageId: GAME_PACKAGE_ID });
 
+  // Helper: Save active game session to localStorage
+  const saveGameSession = useCallback((gameId: string, tier: Tier) => {
+    const session = {
+      gameId,
+      tier,
+      userAddress: address,
+      joinedAt: Date.now(),
+    };
+    localStorage.setItem('activeGameSession', JSON.stringify(session));
+    console.log('💾 [App] Game session saved:', gameId.slice(0, 8) + '...');
+  }, [address]);
+
+  // Helper: Clear active game session from localStorage
+  const clearGameSession = useCallback(() => {
+    localStorage.removeItem('activeGameSession');
+    console.log('🗑️ [App] Game session cleared');
+  }, []);
+
+  // Check for active game session on wallet connection
   useEffect(() => {
-    if (gamePhase === 'lobby' && gameInfo) {
-      const interval = setInterval(() => {
-        setGameInfo(prev => {
-          if (!prev) return prev;
-          const newCount = prev.playerCount + Math.floor(Math.random() * 3);
-          if (newCount >= 10) {
-            setTimeout(() => {
-              setGamePhase('active');
-              setGameInfo(prev => prev ? {
-                ...prev,
-                status: GameStatus.ACTIVE,
-                currentRound: 1,
-                currentQuestioner: address || '',
-              } : null);
-              setTimeRemaining(120000);
-            }, 2000);
-            return { ...prev, playerCount: Math.min(newCount, 25) };
-          }
-          return { ...prev, playerCount: newCount };
+    const checkActiveGame = async () => {
+      if (!isConnected || !gameActions) return;
+
+      console.log('🔍 [App] Checking for active game session...');
+
+      try {
+        const sessionData = localStorage.getItem('activeGameSession');
+        if (!sessionData) {
+          console.log('✅ [App] No active game session found');
+          return;
+        }
+
+        const session = JSON.parse(sessionData);
+        console.log('📦 [App] Found session:', session.gameId.slice(0, 8) + '...');
+
+        // Verify the session belongs to current user
+        if (session.userAddress !== address) {
+          console.log('❌ [App] Session user mismatch, clearing');
+          clearGameSession();
+          return;
+        }
+
+        // Verify game still exists and user is in it
+        const gameData = await gameActions.getGameInfo(session.gameId);
+        if (!gameData) {
+          console.log('❌ [App] Game not found on blockchain, clearing session');
+          clearGameSession();
+          return;
+        }
+
+        // Check if user is still in the game
+        const isPlayerInGame = gameData.players.includes(address!);
+        const isPlayerEliminated = gameData.eliminated.includes(address!);
+
+        if (!isPlayerInGame) {
+          console.log('❌ [App] Player not in game, clearing session');
+          clearGameSession();
+          return;
+        }
+
+        console.log('✅ [App] Active game found! Rejoining...');
+        console.log('   - Game ID:', session.gameId.slice(0, 8) + '...');
+        console.log('   - Status:', gameData.status);
+        console.log('   - Player Count:', gameData.players.length);
+        console.log('   - Eliminated:', isPlayerEliminated);
+
+        // Restore game state
+        setSelectedTier(session.tier);
+        setGameInfo({
+          gameId: session.gameId,
+          tier: session.tier,
+          status: gameData.status,
+          currentRound: gameData.currentRound,
+          playerCount: gameData.players.length,
+          eliminatedCount: gameData.eliminated.length,
+          prizePool: Number(gameData.prizePool) / 1_000_000_000,
+          currentQuestioner: gameData.currentQuestioner,
+          questionAsked: gameData.question?.text ? true : false,
         });
-      }, 2000);
+
+        // Redirect to appropriate phase
+        if (gameData.status === GameStatus.WAITING) {
+          console.log('📍 [App] Redirecting to lobby (game waiting)');
+          setGamePhase('lobby');
+        } else if (gameData.status === GameStatus.ACTIVE) {
+          console.log('📍 [App] Redirecting to active game');
+          setGamePhase('active');
+        } else if (gameData.status === GameStatus.FINISHED) {
+          if (isPlayerEliminated) {
+            console.log('📍 [App] Redirecting to results (player eliminated)');
+            setIsEliminated(true);
+          } else {
+            console.log('📍 [App] Redirecting to results (game finished)');
+          }
+          setGamePhase('results');
+        }
+      } catch (error) {
+        console.error('❌ [App] Error checking active game:', error);
+        clearGameSession();
+      }
+    };
+
+    checkActiveGame();
+  }, [isConnected, address, gameActions, clearGameSession]);
+
+  // Handler for when GameLobby detects game start
+  const handleGameStart = useCallback((gameData: any) => {
+    console.log('🎮 [App] GameLobby notified of game start');
+    console.log('   - Players:', gameData.playerCount);
+    console.log('   - Status:', gameData.status);
+
+    // Update game info with fresh data from GameLobby
+    setGameInfo(prev => prev ? {
+      ...prev,
+      status: gameData.status,
+      currentRound: gameData.currentRound,
+      playerCount: gameData.playerCount,
+      eliminatedCount: gameData.eliminatedCount,
+      prizePool: Number(gameData.prizePool) / 1_000_000_000,
+      currentQuestioner: gameData.currentQuestioner,
+      questionAsked: gameData.question?.text ? true : false,
+    } : null);
+
+    // Transition to active phase
+    console.log('✅ [App] Transitioning to active game phase');
+    setGamePhase('active');
+    setTimeRemaining(120000);
+  }, []);
+
+  // Poll game data during active phase
+  useEffect(() => {
+    if (gamePhase === 'active' && gameInfo?.gameId && gameActions) {
+      console.log('🎮 [App] Starting active game polling for game:', gameInfo.gameId.slice(0, 8) + '...');
+
+      const pollActiveGame = async () => {
+        try {
+          // Fetch fresh game data from blockchain
+          const gameData = await gameActions.getGameInfo(gameInfo.gameId);
+
+          if (gameData) {
+            const playerCount = gameData.players.length;
+            const eliminatedCount = gameData.eliminated.length;
+
+            console.log('📊 [App] Active game poll - Questioner:', gameData.currentQuestioner?.slice(0, 8) + '...', 'Question Asked:', gameData.question?.text ? 'Yes' : 'No');
+
+            // Update game info with fresh blockchain data
+            setGameInfo(prev => prev ? {
+              ...prev,
+              status: gameData.status,
+              currentRound: gameData.currentRound,
+              playerCount,
+              eliminatedCount,
+              prizePool: Number(gameData.prizePool) / 1_000_000_000,
+              currentQuestioner: gameData.currentQuestioner,
+              questionAsked: gameData.question?.text ? true : false,
+            } : null);
+
+            // If question was asked and we haven't shown it yet, update the question
+            if (gameData.question?.text && !question) {
+              console.log('✅ [App] Question received from blockchain!');
+              setQuestion({
+                question: gameData.question.text,
+                optionA: gameData.question.option_a || '',
+                optionB: gameData.question.option_b || '',
+                optionC: gameData.question.option_c || '',
+              });
+            }
+
+            // Check if game finished
+            if (gameData.status === GameStatus.FINISHED) {
+              console.log('✅ [App] Game finished! Transitioning to results...');
+              setGamePhase('results');
+            }
+          }
+        } catch (error) {
+          console.error('❌ [App] Error polling active game:', error);
+        }
+      };
+
+      // Poll immediately on mount, then every 1.5 seconds
+      pollActiveGame();
+      const interval = setInterval(pollActiveGame, 1500);
+
       return () => clearInterval(interval);
     }
-  }, [gamePhase, gameInfo, address]);
+  }, [gamePhase, gameInfo?.gameId, gameActions, question]);
 
+  // Timer for active game
   useEffect(() => {
     if (gamePhase === 'active' && timeRemaining > 0) {
       const timer = setInterval(() => {
@@ -100,7 +262,7 @@ function App() {
         console.log('✅ [App] Game data fetched:', gameData);
 
         // Transform blockchain data to GameInfo format
-        setGameInfo({
+        const gameInfo = {
           gameId,
           tier: selectedTier,
           status: gameData.status,
@@ -110,8 +272,11 @@ function App() {
           prizePool: Number(gameData.prizePool) / 1_000_000_000, // Convert MIST to OCT
           currentQuestioner: gameData.currentQuestioner,
           questionAsked: gameData.question?.text ? true : false,
-        });
+        };
 
+        setGameInfo(gameInfo);
+        // Save game session to localStorage for persistence
+        saveGameSession(gameId, selectedTier);
         setGamePhase('lobby');
       } else {
         console.error('❌ [App] Failed to fetch game data');
@@ -119,7 +284,7 @@ function App() {
     } catch (error) {
       console.error('❌ [App] Error joining game:', error);
     }
-  }, [selectedTier, gameActions]);
+  }, [selectedTier, gameActions, saveGameSession]);
 
   const handleCreateNewGame = useCallback(async () => {
     if (!selectedTier || !gameActions) return;
@@ -136,14 +301,11 @@ function App() {
       // For now, we'll wait a moment then try to get the latest game
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Get game info after creation
-      // In production, you'd query for the game ID from the transaction result
-      // For now, we fetch the game from discovery to get the latest
       console.log('⏳ [App] Waiting for game to be indexed...');
-      // This is a simplified approach - in production, parse the transaction result for game ID
+      // TODO: In production, parse transaction result for created game ID
+      // For now, navigate back to discovery which will refresh and show the new game
+      // User can then join their own created game from the list
 
-      // Fetch updated game list from discovery and find the newest one
-      // For MVP, navigate to discovery which will refresh and show the new game
       setGamePhase('discovery');
       console.log('✅ [App] Game created! Refreshing discovery...');
     } catch (error) {
@@ -207,6 +369,8 @@ function App() {
   }, []);
 
   const handleLeaveGame = useCallback(() => {
+    console.log('👋 [App] Leaving game');
+    clearGameSession();
     setGamePhase('home');
     setSelectedTier(null);
     setGameInfo(null);
@@ -218,7 +382,7 @@ function App() {
     setVotingStats(null);
     setIsEliminated(false);
     setSurvivors([]);
-  }, []);
+  }, [clearGameSession]);
 
   const handleClaimPrize = useCallback(() => {
     console.log('Claiming prize...');
@@ -306,15 +470,17 @@ function App() {
           />
         )}
 
-        {gamePhase === 'lobby' && selectedTier && gameInfo && (
+        {gamePhase === 'lobby' && selectedTier && gameInfo && gameInfo.status === GameStatus.WAITING && (
           <GameLobby
             tier={selectedTier}
-            playerCount={gameInfo.playerCount}
+            gameId={gameInfo.gameId}
+            packageId={GAME_PACKAGE_ID}
             onLeave={handleLeaveGame}
+            onGameStart={handleGameStart}
           />
         )}
 
-        {gamePhase === 'active' && gameInfo && address && (
+        {gamePhase === 'active' && gameInfo && address && gameInfo.status === GameStatus.ACTIVE && (
           <ActiveGame
             gameInfo={gameInfo}
             question={question}
