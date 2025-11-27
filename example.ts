@@ -5,7 +5,7 @@ configDotenv()
 
 async function playGame() {
   // === SETUP ===
-  const packageId = '0xf6ad51b69b0a755ccaa7c7a192eb931ffc155522db2d141ae4fad1b1c062e85a';
+  const packageId = '0x16d2cab2772b1fc4372cefe3a50c76bc3c18feb9b7b685f56cd7b46c9e923d0a';
 
   // Sponsor (pays gas for all transactions)
   const sponsorKeypair = Ed25519Keypair.deriveKeypair(

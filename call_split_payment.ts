@@ -6,7 +6,7 @@ configDotenv()
 // Setup
 const clien = new SuiClient({ url: "https://rpc-testnet.onelabs.cc:443" });
 const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED!); // From `one keytool export`
-const packageId = '0xb3b75e02a830284ee0e905bf8e3c15d88ae5697336bfa1f65b267edf1bf5032d';
+const packageId = '0x16d2cab2772b1fc4372cefe3a50c76bc3c18feb9b7b685f56cd7b46c9e923d0a';
 
 async function splitPayment() {
   const tx = new TransactionBlock();
