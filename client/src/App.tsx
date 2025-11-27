@@ -14,6 +14,16 @@ function App() {
   const [address, setAddress] = useState<string | null>(null);
   const isConnected = !!address;
   const [error, setError] = useState<string | null>(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+
+  const handleConnect = useCallback(() => {
+    setShowWalletModal(true);
+  }, []);
+
+  const handleWalletSelect = useCallback((mockAddress: string) => {
+    setAddress(mockAddress);
+    setShowWalletModal(false);
+  }, []);
   
   const [gamePhase, setGamePhase] = useState<GamePhase>('home');
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
@@ -154,7 +164,7 @@ function App() {
 
   return (
     <>
-      <Header />
+      <Header walletAddress={address} onConnect={handleConnect} />
 
       <main>
         {gamePhase === 'home' && (
@@ -272,6 +282,66 @@ function App() {
           zIndex: 1000,
         }}>
           {error}
+        </div>
+      )}
+
+      {showWalletModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            background: '#1a1a23',
+            borderRadius: '16px',
+            padding: '2rem',
+            maxWidth: '400px',
+            border: '1px solid rgba(124, 58, 237, 0.2)',
+          }}>
+            <h2 style={{ color: '#fff', marginBottom: '1.5rem', textAlign: 'center' }}>
+              Connect Wallet
+            </h2>
+            <p style={{ color: '#999', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+              Select a wallet to connect to OneChain Testnet
+            </p>
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <button
+                onClick={() => handleWalletSelect('0x' + '0'.repeat(64))}
+                style={{
+                  padding: '1rem',
+                  background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                }}
+              >
+                Demo Wallet
+              </button>
+              <button
+                onClick={() => setShowWalletModal(false)}
+                style={{
+                  padding: '1rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(124, 58, 237, 0.5)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+            <p style={{ color: '#666', fontSize: '0.8rem', marginTop: '1.5rem', textAlign: 'center' }}>
+              Real wallet integration coming soon
+            </p>
+          </div>
         </div>
       )}
     </>

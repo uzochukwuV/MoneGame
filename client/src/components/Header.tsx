@@ -1,4 +1,9 @@
-export function Header() {
+interface HeaderProps {
+  walletAddress?: string | null;
+  onConnect?: () => void;
+}
+
+export function Header({ walletAddress, onConnect }: HeaderProps) {
   return (
     <header className="header">
       <div className="header-content">
@@ -14,7 +19,15 @@ export function Header() {
         </nav>
 
         <div className="wallet-section">
-          <button className="wallet-button">Connect Wallet</button>
+          {walletAddress ? (
+            <button className="wallet-button" title={walletAddress}>
+              {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+            </button>
+          ) : (
+            <button className="wallet-button" onClick={onConnect}>
+              Connect Wallet
+            </button>
+          )}
         </div>
       </div>
     </header>
