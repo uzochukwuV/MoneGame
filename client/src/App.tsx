@@ -9,7 +9,6 @@ import { GameResults } from './components/GameResults';
 import { Tier, GameStatus, TIER_FEES } from './types/game';
 import type { GameInfo, Question, VotingStats } from './types/game';
 import { GameDiscovery } from './components/GameDiscovery';
-import { useGameDiscovery } from './hooks/useGameDiscovery';
 import { useGameActions } from './hooks/useGameActions';
 import { GAME_PACKAGE_ID } from './config/game';
 
@@ -197,9 +196,9 @@ function App() {
               console.log('✅ [App] Question received from blockchain!');
               setQuestion({
                 question: gameData.question.text,
-                optionA: gameData.question.option_a || '',
-                optionB: gameData.question.option_b || '',
-                optionC: gameData.question.option_c || '',
+                optionA: gameData.question.optionA || '',
+                optionB: gameData.question.optionB || '',
+                optionC: gameData.question.optionC || '',
               });
             }
 

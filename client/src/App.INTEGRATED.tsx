@@ -7,6 +7,7 @@ import { ActiveGame } from './components/ActiveGame';
 import { GameResults } from './components/GameResults';
 import { useGameState } from './hooks/useGameState';
 import { Tier } from './types/game';
+import { GAME_PACKAGE_ID } from './config/game';
 
 function App() {
   const currentAccount = useCurrentAccount();
@@ -130,11 +131,13 @@ function App() {
           </>
         )}
 
-        {state.phase === 'lobby' && state.tier && (
+        {state.phase === 'lobby' && state.tier && state.gameId && (
           <GameLobby
             tier={state.tier}
-            playerCount={state.playerCount}
+            gameId={state.gameId}
+            packageId={GAME_PACKAGE_ID}
             onLeave={actions.leaveGame}
+            onGameStart={() => {}}
           />
         )}
 

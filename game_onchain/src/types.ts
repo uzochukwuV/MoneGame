@@ -9,7 +9,7 @@ export interface SponsorConfig {
   maxGasPerTx?: number;
 }
 
-export enum Tier {
+export const enum Tier {
   TIER_1 = 1,
   TIER_2 = 2,
   TIER_3 = 3,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Tier, TIER_NAMES, TIER_FEES, GameStatus } from '../types/game';
 import { useSuiClient } from '@mysten/dapp-kit';
 
@@ -14,7 +14,6 @@ export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: Gam
   const minPlayers = 10;
   const suiClient = useSuiClient();
   const [playerCount, setPlayerCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
 
   // Poll for game updates
@@ -56,7 +55,6 @@ export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: Gam
 
         // Update player count
         setPlayerCount(newPlayerCount);
-        setIsLoading(false);
 
         // If game has started (status changed to ACTIVE or 10+ players), notify parent ONLY ONCE
         if (!gameStarted && (newPlayerCount >= minPlayers || gameStatus === GameStatus.ACTIVE)) {

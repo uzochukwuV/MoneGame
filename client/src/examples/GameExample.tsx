@@ -24,7 +24,7 @@ export function GameExample() {
     }
 
     try {
-      const digest = await joinGame(gameId, 1, TIER_ENTRY_FEES[1]);
+      const digest = await joinGame(gameId, 1);
       console.log('Joined game:', digest);
     } catch (err) {
       console.error('Failed to join game:', err);

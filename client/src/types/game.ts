@@ -1,4 +1,4 @@
-export enum Tier {
+export const enum Tier {
   TIER_1 = 1,
   TIER_2 = 2,
   TIER_3 = 3,
@@ -22,7 +22,7 @@ export const TIER_NAMES: Record<Tier, string> = {
   [Tier.TIER_5]: 'Whale',
 };
 
-export enum GameStatus {
+export const enum GameStatus {
   WAITING = 0,
   ACTIVE = 1,
   FINISHED = 2,

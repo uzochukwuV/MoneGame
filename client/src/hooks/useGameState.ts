@@ -169,10 +169,10 @@ export function useGameState() {
     }
   }, [gameActions]);
 
-  const joinGame = useCallback(async (gameId: string, tier: Tier, entryFee: number) => {
+  const joinGame = useCallback(async (gameId: string, tier: Tier) => {
     try {
-      const txDigest = await gameActions.joinGame(gameId, tier, entryFee);
-      
+      const txDigest = await gameActions.joinGame(gameId, tier);
+
       setState(prev => ({
         ...prev,
         phase: 'lobby',
