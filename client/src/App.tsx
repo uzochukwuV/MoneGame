@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useCurrentAccount } from '@mysten/dapp-kit';
 import { Header } from './components/Header';
 import { TierSelection } from './components/TierSelection';
 import { HowToPlay } from './components/HowToPlay';
@@ -12,9 +11,9 @@ import type { GameInfo, Question, VotingStats } from './types/game';
 type GamePhase = 'home' | 'lobby' | 'active' | 'results';
 
 function App() {
-  const currentAccount = useCurrentAccount();
-  const address = currentAccount?.address || null;
-  const isConnected = !!currentAccount;
+  const [address, setAddress] = useState<string | null>(null);
+  const isConnected = !!address;
+  const [error, setError] = useState<string | null>(null);
   
   const [gamePhase, setGamePhase] = useState<GamePhase>('home');
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);

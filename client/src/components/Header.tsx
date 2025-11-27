@@ -1,5 +1,3 @@
-import { ConnectButton } from '@mysten/dapp-kit';
-
 export function Header() {
   return (
     <header className="header">
@@ -16,7 +14,7 @@ export function Header() {
         </nav>
 
         <div className="wallet-section">
-          <ConnectButton />
+          <button className="wallet-button">Connect Wallet</button>
         </div>
       </div>
     </header>

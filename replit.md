@@ -1,7 +1,7 @@
 # Majority Rules - OneChain Battle Royale Game
 
 ## Overview
-A blockchain-based battle royale game where players vote on questions and the majority wins. Survive 3 elimination rounds and split the prize pool with fellow survivors. Built on OneChain (Sui-based) with OneWallet integration.
+A blockchain-based battle royale game where players vote on questions and the majority wins. Survive 3 elimination rounds and split the prize pool with fellow survivors. Built on OneChain (Sui-based) with wallet integration for blockchain interactions.
 
 ## Project Type
 Full-stack application with:
@@ -9,12 +9,11 @@ Full-stack application with:
 - **Backend SDK**: TypeScript library for blockchain interaction
 
 ## Recent Changes (November 27, 2025)
-- Created complete React + Vite + TypeScript frontend
-- Implemented modern dark theme UI with glassmorphism effects (inspired by yellow.network/reactive.network)
-- Built OneWallet integration for OneChain blockchain connectivity
-- Created all game flow components: Hero, TierSelection, GameLobby, ActiveGame, GameResults, HowToPlay
-- Configured Vite for Replit environment (port 5000, host 0.0.0.0, allow all hosts)
-- Migrated backend SDK from deprecated `@mysten/sui.js` to `@mysten/sui`
+- Downgraded React from 19 to 18 for compatibility with libraries
+- Removed complex dApp Kit provider setup due to React version conflicts
+- Simplified wallet integration to basic state management (ConnectButton placeholder)
+- Fixed undefined state error in App component
+- Frontend now renders successfully with clean dark theme UI
 
 ## Project Architecture
 
@@ -29,9 +28,6 @@ Full-stack application with:
 │   │   │   ├── ActiveGame.tsx
 │   │   │   ├── GameResults.tsx
 │   │   │   └── HowToPlay.tsx
-│   │   ├── hooks/             # Custom React hooks
-│   │   │   ├── useOneWallet.ts
-│   │   │   └── useGameState.ts
 │   │   ├── types/             # TypeScript types
 │   │   │   └── game.ts
 │   │   ├── App.tsx            # Main application component
@@ -49,7 +45,7 @@ Full-stack application with:
 
 ### Frontend Components
 
-1. **Header** - Navigation bar with wallet connection
+1. **Header** - Navigation bar with wallet connection button
 2. **TierSelection** - Choose game entry tier (0.01-100 OCT)
 3. **GameLobby** - Wait for players and game start
 4. **ActiveGame** - Ask questions, vote, and see results
@@ -91,10 +87,13 @@ Frontend runs on port 5000.
 
 ### Dependencies
 **Frontend (client/):**
-- react, react-dom
+- react (18.3.1), react-dom (18.3.1)
 - vite
 - typescript
 - tailwind CSS (via PostCSS)
+- @mysten/dapp-kit (installed but not used in providers due to compatibility)
+- @mysten/sui (for blockchain interaction)
+- @tanstack/react-query (installed but not used in providers)
 
 **Backend (game_onchain/):**
 - @mysten/sui
@@ -108,11 +107,10 @@ Frontend runs on port 5000.
 
 ## Development Notes
 
-### OneWallet Integration
-The frontend uses OneWallet for OneChain connectivity:
-- `useOneWallet` hook manages wallet connection state
-- Handles connect/disconnect, installation guidance
-- Provides address and balance information
+### Current Wallet Integration Status
+- Using basic state management for wallet connection (ConnectButton placeholder)
+- Ready to integrate with Sui dApp Kit once React/provider compatibility issues are resolved
+- Can be extended to support real wallet connection via OneWallet or Sui Wallet
 
 ### Gas Sponsorship Model
 The game uses a unique gasless transaction model:
@@ -120,13 +118,27 @@ The game uses a unique gasless transaction model:
 - Players only pay entry fees to join games
 - Prize claiming is paid by the winner
 
-### Future Improvements
-1. Replace simulated game state with real MajorityRulesClient interactions
-2. Add cleanup for outstanding setTimeout timers
-3. Extend OneWallet hook for provider events (account/network changes)
-4. Connect to live OneChain testnet/mainnet
+### Next Steps for Wallet Integration
+1. Implement proper ConnectButton click handler to integrate with Sui dApp Kit
+2. Add useCurrentAccount hook back when React 18 compatibility is confirmed
+3. Connect to live OneChain testnet/mainnet for real transactions
+4. Replace simulated game state with real MajorityRulesClient interactions
 
 ## User Preferences
 - Modern, clean UI similar to yellow.network/reactive.network
-- OneWallet integration (not standard Sui wallet)
+- Wallet integration via Sui dApp Kit (not OneWallet which redirects to website)
 - Dark theme with bright gradient accents
+- Fast iteration and responsive UI
+
+## Known Issues & Technical Debt
+1. React 18 downgrade from 19 for dApp Kit compatibility
+2. Wallet connection currently placeholder - needs real Sui dApp Kit integration
+3. Game logic uses simulated state - needs connection to MajorityRulesClient
+4. Unused packages: @tanstack/react-query, @mysten/dapp-kit (installed for future use)
+
+## Future Improvements
+1. Complete Sui dApp Kit integration for real wallet connectivity
+2. Connect frontend to MajorityRulesClient for blockchain interactions
+3. Add cleanup for outstanding setTimeout timers
+4. Implement leaderboard functionality
+5. Add support for multiple networks (testnet/mainnet)
