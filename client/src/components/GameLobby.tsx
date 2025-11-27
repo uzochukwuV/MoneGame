@@ -15,6 +15,7 @@ export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: Gam
   const suiClient = useSuiClient();
   const [playerCount, setPlayerCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [gameStarted, setGameStarted] = useState(false);
 
   // Poll for game updates
   useEffect(() => {
@@ -36,32 +37,46 @@ export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: Gam
         }
 
         const fields = gameObject.data.content.fields as any;
-        const newPlayerCount = fields.players?.length || 0;
+
+        // Extract fields using same pattern as useGameActions.getGameInfo
+        const newPlayerCount = (fields.players || []).length;
+        const eliminatedCount = (fields.eliminated || []).length;
         const gameStatus = fields.status || GameStatus.WAITING;
         const currentRound = fields.current_round || 0;
-        const eliminatedCount = fields.eliminated?.length || 0;
+        const prizePool = fields.prize_pool || '0';
+        const currentQuestioner = fields.current_questioner || '';
+        const question = fields.question ? {
+          text: fields.question.text || '',
+          optionA: fields.question.option_a || '',
+          optionB: fields.question.option_b || '',
+          optionC: fields.question.option_c || '',
+        } : null;
 
-        console.log('📊 [GameLobby] Poll - Players:', newPlayerCount, 'Status:', gameStatus);
+        console.log('📊 [GameLobby] Poll - Players:', newPlayerCount, 'Status:', gameStatus, 'Eliminated:', eliminatedCount);
 
         // Update player count
         setPlayerCount(newPlayerCount);
         setIsLoading(false);
 
-        // If game has started (status changed to ACTIVE or 10+ players), notify parent
-        if (newPlayerCount >= minPlayers || gameStatus === GameStatus.ACTIVE) {
+        // If game has started (status changed to ACTIVE or 10+ players), notify parent ONLY ONCE
+        if (!gameStarted && (newPlayerCount >= minPlayers || gameStatus === GameStatus.ACTIVE)) {
           console.log('✅ [GameLobby] Game starting! Notifying parent...');
           console.log('   - Players:', newPlayerCount);
           console.log('   - Status:', gameStatus);
+          console.log('   - Eliminated:', eliminatedCount);
 
-          // Pass full game data to parent so it can update gameInfo
+          // Mark as started to prevent multiple calls
+          setGameStarted(true);
+
+          // Pass full game data to parent using same structure as useGameActions
           onGameStart({
             status: gameStatus,
             currentRound,
             playerCount: newPlayerCount,
             eliminatedCount,
-            prizePool: fields.prize_pool || '0',
-            currentQuestioner: fields.current_questioner || '',
-            question: fields.question || null,
+            prizePool,
+            currentQuestioner,
+            question,
           });
         }
       } catch (error) {
@@ -76,7 +91,7 @@ export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: Gam
     return () => {
       clearInterval(interval);
     };
-  }, [gameId, suiClient, packageId, onGameStart]);
+  }, [gameId, suiClient, packageId, onGameStart, gameStarted]);
 
   const progress = Math.min((playerCount / minPlayers) * 100, 100);
 
