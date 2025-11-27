@@ -211,6 +211,13 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     setError(null);
 
     try {
+      console.log('🎯 [useGameActions] Asking question with:');
+      console.log('   - gameId:', gameId);
+      console.log('   - question:', question);
+      console.log('   - options:', optionA, optionB, optionC);
+      console.log('   - myAnswer:', myAnswer);
+      console.log('   - currentUser:', currentAccount.address);
+
       const tx = new Transaction();
 
       tx.moveCall({
@@ -222,22 +229,71 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
           tx.pure.string(optionB),
           tx.pure.string(optionC),
           tx.pure.u8(myAnswer),
+          tx.object(CLOCK_OBJECT),
         ],
       });
 
+      console.log('📤 [useGameActions] Sending ask_question transaction...');
       const result = await signAndExecute({
         transaction: tx,
       });
 
+      console.log('✅ [useGameActions] Ask question successful!');
+      console.log('   - Digest:', result.digest);
       return result.digest;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to ask question';
+      console.error('❌ [useGameActions] Ask question failed:');
+      console.error('   - Error:', errorMsg);
+      console.error('   - Full error:', err);
       setError(errorMsg);
       throw err;
     } finally {
       setIsLoading(false);
     }
   }, [currentAccount, packageId, signAndExecute]);
+
+  const startGame = useCallback(async (gameId: string) => {
+  if (!currentAccount) {
+    throw new Error('Wallet not connected');
+  }
+
+  setIsLoading(true);
+  setError(null);
+
+  try {
+    console.log('🚀 Starting game:', gameId.slice(0, 8) + '...');
+
+    // Create transaction
+    const tx = new Transaction();
+
+    // Call start_game
+    tx.moveCall({
+      target: `${packageId}::battle_royale::start_game`,
+      arguments: [
+        tx.object(gameId),
+        tx.object(CLOCK_OBJECT),
+      ],
+    });
+
+    console.log('📤 Executing start game transaction...');
+    const result = await signAndExecute({
+      transaction: tx,
+    });
+
+    console.log('✅ Successfully started game! Digest:', result.digest);
+    return result.digest;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Failed to start game';
+    console.error('❌ Start game error:', errorMsg);
+    setError(errorMsg);
+    throw err;
+  } finally {
+    setIsLoading(false);
+  }
+}, [currentAccount, packageId, signAndExecute]);
+
+
 
   const submitAnswer = useCallback(async (gameId: string, choice: 1 | 2 | 3) => {
     if (!currentAccount) {
@@ -255,6 +311,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
         arguments: [
           tx.object(gameId),
           tx.pure.u8(choice),
+          tx.object(CLOCK_OBJECT),
         ],
       });
 
@@ -262,9 +319,11 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
         transaction: tx,
       });
 
+      console.log('✅ [useGameActions] Submit answer successful. Digest:', result.digest);
       return result.digest;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to submit answer';
+      console.error('❌ [useGameActions] Submit answer error:', errorMsg);
       setError(errorMsg);
       throw err;
     } finally {
@@ -450,7 +509,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     // Helpers
     getTierLobby,
     getPlatformTreasury,
-
+    startGame,
     // State
     isLoading,
     error,
