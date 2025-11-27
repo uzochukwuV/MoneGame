@@ -8,8 +8,12 @@ import { ActiveGame } from './components/ActiveGame';
 import { GameResults } from './components/GameResults';
 import { Tier, GameStatus, TIER_FEES } from './types/game';
 import type { GameInfo, Question, VotingStats } from './types/game';
+import { GameDiscovery } from './components/GameDiscovery';
+import { useGameDiscovery } from './hooks/useGameDiscovery';
+import { useGameActions } from './hooks/useGameActions';
+import { GAME_PACKAGE_ID } from './config/game';
 
-type GamePhase = 'home' | 'lobby' | 'active' | 'results';
+type GamePhase = 'home' | 'discovery' | 'lobby' | 'active' | 'results';
 
 function App() {
   const currentAccount = useCurrentAccount();
@@ -27,6 +31,9 @@ function App() {
   const [votingStats, setVotingStats] = useState<VotingStats | null>(null);
   const [isEliminated, setIsEliminated] = useState(false);
   const [survivors, setSurvivors] = useState<string[]>([]);
+
+  // Initialize game actions hook
+  const gameActions = useGameActions({ packageId: GAME_PACKAGE_ID });
 
   useEffect(() => {
     if (gamePhase === 'lobby' && gameInfo) {
@@ -68,20 +75,87 @@ function App() {
       return;
     }
 
+    console.log('🎯 [App] Tier selected:', tier);
     setSelectedTier(tier);
-    setGamePhase('lobby');
-    setGameInfo({
-      gameId: `game_${Date.now()}`,
-      tier,
-      status: GameStatus.WAITING,
-      currentRound: 0,
-      playerCount: Math.floor(Math.random() * 5) + 2,
-      eliminatedCount: 0,
-      prizePool: 0,
-      currentQuestioner: '',
-      questionAsked: false,
-    });
+    // Go to discovery to check for games in this tier
+    // Discovery will either show games to join or prompt to create
+    setGamePhase('discovery');
   }, [isConnected]);
+
+  const handleSelectGame = useCallback(async (gameId: string) => {
+    if (!selectedTier || !gameActions) return;
+
+    console.log('➡️ [App] User selected game:', gameId.slice(0, 8) + '...');
+
+    try {
+      // Call blockchain to join the game
+      console.log('📤 [App] Calling joinGame on blockchain...');
+      const txDigest = await gameActions.joinGame(gameId, selectedTier);
+      console.log('✅ [App] Join transaction sent:', txDigest);
+
+      // Fetch actual game data from blockchain
+      const gameData = await gameActions.getGameInfo(gameId);
+
+      if (gameData) {
+        console.log('✅ [App] Game data fetched:', gameData);
+
+        // Transform blockchain data to GameInfo format
+        setGameInfo({
+          gameId,
+          tier: selectedTier,
+          status: gameData.status,
+          currentRound: gameData.currentRound,
+          playerCount: gameData.players.length,
+          eliminatedCount: gameData.eliminated.length,
+          prizePool: Number(gameData.prizePool) / 1_000_000_000, // Convert MIST to OCT
+          currentQuestioner: gameData.currentQuestioner,
+          questionAsked: gameData.question?.text ? true : false,
+        });
+
+        setGamePhase('lobby');
+      } else {
+        console.error('❌ [App] Failed to fetch game data');
+      }
+    } catch (error) {
+      console.error('❌ [App] Error joining game:', error);
+    }
+  }, [selectedTier, gameActions]);
+
+  const handleCreateNewGame = useCallback(async () => {
+    if (!selectedTier || !gameActions) return;
+
+    console.log('🆕 [App] Creating new game for tier:', selectedTier);
+
+    try {
+      // Call blockchain to create game
+      const txDigest = await gameActions.createGame(selectedTier);
+      console.log('📤 [App] Create game transaction sent:', txDigest);
+
+      // Fetch the newly created game to get its ID
+      // Note: There's a small delay before the event is indexed
+      // For now, we'll wait a moment then try to get the latest game
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Get game info after creation
+      // In production, you'd query for the game ID from the transaction result
+      // For now, we fetch the game from discovery to get the latest
+      console.log('⏳ [App] Waiting for game to be indexed...');
+      // This is a simplified approach - in production, parse the transaction result for game ID
+
+      // Fetch updated game list from discovery and find the newest one
+      // For MVP, navigate to discovery which will refresh and show the new game
+      setGamePhase('discovery');
+      console.log('✅ [App] Game created! Refreshing discovery...');
+    } catch (error) {
+      console.error('❌ [App] Error creating game:', error);
+    }
+  }, [selectedTier, gameActions]);
+
+  const handleCancelDiscovery = useCallback(() => {
+    console.log('❌ [App] Cancelled game discovery, returning home');
+    setGamePhase('home');
+    setSelectedTier(null);
+  }, []);
 
   const handleAskQuestion = useCallback((q: Question, myAnswer: 1 | 2 | 3) => {
     setQuestion(q);
@@ -223,6 +297,15 @@ function App() {
           </>
         )}
 
+        {gamePhase === 'discovery' && selectedTier && (
+          <GameDiscovery
+            tier={selectedTier}
+            onSelectGame={handleSelectGame}
+            onCreateNew={handleCreateNewGame}
+            onCancel={handleCancelDiscovery}
+          />
+        )}
+
         {gamePhase === 'lobby' && selectedTier && gameInfo && (
           <GameLobby
             tier={selectedTier}
@@ -258,6 +341,8 @@ function App() {
             onPlayAgain={handleLeaveGame}
           />
         )}
+
+      
       </main>
 
     </>

@@ -1,5 +1,5 @@
 // Replace with your deployed package ID
-export const GAME_PACKAGE_ID = '0x_YOUR_PACKAGE_ID_HERE';
+export const GAME_PACKAGE_ID = '0x16d2cab2772b1fc4372cefe3a50c76bc3c18feb9b7b685f56cd7b46c9e923d0a';
 
 // Tier entry fees in MIST (1 SUI = 1_000_000_000 MIST)
 export const TIER_ENTRY_FEES = {

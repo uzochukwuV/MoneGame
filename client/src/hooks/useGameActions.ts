@@ -1,7 +1,11 @@
 import { useState, useCallback } from 'react';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
-import type { Tier } from '../../../game_onchain/src';
+import type { Tier } from '../types/game';
+import { TIER_FEES } from '../types/game';
+
+// Sui Clock object (shared object at 0x6)
+const CLOCK_OBJECT = '0x0000000000000000000000000000000000000000000000000000000000000006';
 
 interface UseGameActionsProps {
   packageId: string;
@@ -32,6 +36,53 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const getTierLobby = useCallback(
+    async (tier: Tier): Promise<string> => {
+      console.log('🎟️ Querying tier lobby for tier:', tier);
+      const response = await suiClient.queryEvents({
+        query: {
+          MoveEventType: `${packageId}::majority_rules::TierLobbyCreated`,
+        } as any,
+      });
+
+      console.log('📦 TierLobbyCreated events:', response.data?.length);
+
+      const tierEvent = response.data?.find((event: any) =>
+        Number(event.parsedJson?.tier) === tier
+      ) as any;
+
+      if (!tierEvent) {
+        throw new Error(`Tier ${tier} lobby not found`);
+      }
+
+      const lobbyId = tierEvent.parsedJson?.lobby_id;
+      console.log('✅ Found lobby ID:', lobbyId?.slice(0, 8) + '...');
+      return lobbyId;
+    },
+    [suiClient, packageId]
+  );
+
+  const getPlatformTreasury = useCallback(async (): Promise<string> => {
+    console.log('💰 Querying platform treasury...');
+    const objects = await suiClient.getOwnedObjects({
+      owner: packageId,
+      filter: {
+        StructType: `${packageId}::majority_rules::PlatformTreasury`,
+      },
+      options: {
+        showContent: true,
+      },
+    });
+
+    if (!objects.data || objects.data.length === 0) {
+      throw new Error('Platform treasury not found');
+    }
+
+    const treasuryId = objects.data[0]?.data?.objectId;
+    console.log('✅ Found treasury ID:', treasuryId?.slice(0, 8) + '...');
+    return treasuryId!;
+  }, [suiClient, packageId]);
+
   const createGame = useCallback(async (tier: Tier) => {
     if (!currentAccount) {
       throw new Error('Wallet not connected');
@@ -41,31 +92,40 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     setError(null);
 
     try {
+      console.log('🎮 Creating game for tier:', tier);
       const tx = new Transaction();
-      
-      // Add your create game logic here
+
+      // Get tier lobby
+      const lobbyId = await getTierLobby(tier);
+      console.log('🎯 Using lobby ID for transaction:', lobbyId.slice(0, 8) + '...');
+
+      // Call create_game with lobby and clock
       tx.moveCall({
         target: `${packageId}::majority_rules::create_game`,
         arguments: [
-          tx.pure.u8(tier),
+          tx.object(lobbyId),
+          tx.object(CLOCK_OBJECT),
         ],
       });
 
+      console.log('📤 Executing create game transaction...');
       const result = await signAndExecute({
         transaction: tx,
       });
 
+      console.log('✅ Game created! Digest:', result.digest);
       return result.digest;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to create game';
+      console.error('❌ Create game error:', errorMsg);
       setError(errorMsg);
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [currentAccount, packageId, signAndExecute]);
+  }, [currentAccount, packageId, signAndExecute, getTierLobby]);
 
-  const joinGame = useCallback(async (gameId: string, tier: Tier, entryFee: number) => {
+  const joinGame = useCallback(async (gameId: string, tier: Tier) => {
     if (!currentAccount) {
       throw new Error('Wallet not connected');
     }
@@ -74,33 +134,63 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     setError(null);
 
     try {
+      console.log('🎮 Joining game:', gameId.slice(0, 8) + '...');
+      const userAddress = currentAccount.address;
+
+      // Get required objects
+      console.log('📦 Fetching lobby, treasury, and user coins...');
+      const lobbyId = await getTierLobby(tier);
+      const treasuryId = await getPlatformTreasury();
+
+      // Get user's coins for entry fee
+      const coins = await suiClient.getAllCoins({ owner: userAddress });
+      if (!coins.data || coins.data.length === 0) {
+        throw new Error('User has no coins');
+      }
+
+      console.log('✅ Found user coins:', coins.data.length);
+
+      // Create transaction
       const tx = new Transaction();
 
-      // Split coins for entry fee
-      const [coin] = tx.splitCoins(tx.gas, [entryFee]);
+      // Split entry fee from user's first coin
+      const entryFeeMIST = TIER_FEES[tier] * 1_000_000_000; // Convert to MIST
+      console.log('💰 Entry fee:', TIER_FEES[tier], 'OCT =', entryFeeMIST, 'MIST');
 
+      const paymentCoin = tx.splitCoins(tx.object(coins.data[0]!.coinObjectId), [
+        entryFeeMIST,
+      ])[0];
+
+      console.log('🎯 Split payment coin, calling join_game...');
+
+      // Call join_game with all required arguments
       tx.moveCall({
         target: `${packageId}::majority_rules::join_game`,
         arguments: [
+          tx.object(lobbyId),
           tx.object(gameId),
-          coin,
-          tx.pure.u8(tier),
+          tx.object(treasuryId),
+          paymentCoin!,
+          tx.object(CLOCK_OBJECT),
         ],
       });
 
+      console.log('📤 Executing join game transaction...');
       const result = await signAndExecute({
         transaction: tx,
       });
 
+      console.log('✅ Successfully joined game! Digest:', result.digest);
       return result.digest;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to join game';
+      console.error('❌ Join game error:', errorMsg);
       setError(errorMsg);
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, [currentAccount, packageId, signAndExecute]);
+  }, [currentAccount, packageId, signAndExecute, suiClient, getTierLobby, getPlatformTreasury]);
 
   const askQuestion = useCallback(async (
     gameId: string,
@@ -345,7 +435,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     askQuestion,
     submitAnswer,
     claimPrize,
-    
+
     // Getters
     getGameInfo,
     getPlayerStatus,
@@ -353,7 +443,11 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     getLobbyInfo,
     getVotingResults,
     canClaimPrize,
-    
+
+    // Helpers
+    getTierLobby,
+    getPlatformTreasury,
+
     // State
     isLoading,
     error,
