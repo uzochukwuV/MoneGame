@@ -35,7 +35,6 @@ export function useOneWallet() {
     isConnecting: false,
     error: null,
   });
-  const [isTransactionExecuting, setIsTransactionExecuting] = useState(false);
 
   const checkConnection = useCallback(async () => {
     if (typeof window !== 'undefined' && window.oneWallet) {
@@ -58,41 +57,6 @@ export function useOneWallet() {
   useEffect(() => {
     checkConnection();
   }, [checkConnection]);
-
-  useEffect(() => {
-    // Set up wallet event listeners if available
-    if (typeof window === 'undefined' || !window.oneWallet?.on) {
-      return;
-    }
-
-    const handleAccountChange = (accounts: any[]) => {
-      if (accounts.length > 0) {
-        setWalletState(prev => ({
-          ...prev,
-          address: accounts[0].address,
-        }));
-      }
-    };
-
-    const handleDisconnect = () => {
-      setWalletState({
-        isConnected: false,
-        address: null,
-        isConnecting: false,
-        error: null,
-      });
-    };
-
-    window.oneWallet.on('accountsChanged', handleAccountChange);
-    window.oneWallet.on('disconnect', handleDisconnect);
-
-    return () => {
-      if (window.oneWallet?.off) {
-        window.oneWallet.off('accountsChanged', handleAccountChange);
-        window.oneWallet.off('disconnect', handleDisconnect);
-      }
-    };
-  }, []);
 
   const connect = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -158,7 +122,6 @@ export function useOneWallet() {
       throw new Error('Wallet not connected. Please connect your wallet first.');
     }
 
-    setIsTransactionExecuting(true);
     try {
       const result = await window.oneWallet.signAndExecuteTransaction({
         transaction,
@@ -172,8 +135,6 @@ export function useOneWallet() {
         error: errorMessage,
       }));
       throw err;
-    } finally {
-      setIsTransactionExecuting(false);
     }
   }, [walletState.isConnected]);
 
@@ -203,7 +164,6 @@ export function useOneWallet() {
 
   return {
     ...walletState,
-    isTransactionExecuting,
     connect,
     disconnect,
     signAndExecuteTransaction,

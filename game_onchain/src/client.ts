@@ -4,6 +4,9 @@ import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { type GameConfig, Tier, TIER_FEES,type GameInfo } from './types';
 import { GasSponsor } from './sponsor';
 
+// Default package ID for OneChain testnet
+const DEFAULT_PACKAGE_ID = '0x16d2cab2772b1fc4372cefe3a50c76bc3c18feb9b7b685f56cd7b46c9e923d0a';
+
 export class MajorityRulesClient {
   private client: SuiClient;
   private packageId: string;
@@ -17,7 +20,7 @@ export class MajorityRulesClient {
         : 'https://rpc-mainnet.onelabs.cc:443');
 
     this.client = new SuiClient({ url: rpcUrl });
-    this.packageId = config.packageId;
+    this.packageId = config.packageId || DEFAULT_PACKAGE_ID;
   }
 
   /**
