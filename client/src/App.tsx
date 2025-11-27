@@ -1,18 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useCurrentAccount } from '@mysten/dapp-kit';
 import { Header } from './components/Header';
 import { TierSelection } from './components/TierSelection';
 import { HowToPlay } from './components/HowToPlay';
 import { GameLobby } from './components/GameLobby';
 import { ActiveGame } from './components/ActiveGame';
 import { GameResults } from './components/GameResults';
-import { useOneWallet } from './hooks/useOneWallet';
 import { Tier, GameStatus, TIER_FEES } from './types/game';
 import type { GameInfo, Question, VotingStats } from './types/game';
 
 type GamePhase = 'home' | 'lobby' | 'active' | 'results';
 
 function App() {
-  const { isConnected, address, isConnecting, connect, disconnect, error } = useOneWallet();
+  const currentAccount = useCurrentAccount();
+  const address = currentAccount?.address || null;
+  const isConnected = !!currentAccount;
   
   const [gamePhase, setGamePhase] = useState<GamePhase>('home');
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null);
@@ -63,7 +65,6 @@ function App() {
 
   const handleSelectTier = useCallback((tier: Tier) => {
     if (!isConnected) {
-      connect();
       return;
     }
 
@@ -80,7 +81,7 @@ function App() {
       currentQuestioner: '',
       questionAsked: false,
     });
-  }, [isConnected, connect]);
+  }, [isConnected]);
 
   const handleAskQuestion = useCallback((q: Question, myAnswer: 1 | 2 | 3) => {
     setQuestion(q);
@@ -154,12 +155,7 @@ function App() {
 
   return (
     <>
-      <Header
-        walletAddress={address}
-        isConnecting={isConnecting}
-        onConnect={connect}
-        onDisconnect={disconnect}
-      />
+      <Header />
 
       <main>
         {gamePhase === 'home' && (

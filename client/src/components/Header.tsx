@@ -1,19 +1,6 @@
-import { useState } from 'react';
+import { ConnectButton } from '@mysten/dapp-kit';
 
-interface HeaderProps {
-  walletAddress: string | null;
-  isConnecting: boolean;
-  onConnect: () => void;
-  onDisconnect: () => void;
-}
-
-export function Header({ walletAddress, isConnecting, onConnect, onDisconnect }: HeaderProps) {
-  const [showDropdown, setShowDropdown] = useState(false);
-
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
+export function Header() {
   return (
     <header className="header">
       <div className="header-content">
@@ -29,32 +16,7 @@ export function Header({ walletAddress, isConnecting, onConnect, onDisconnect }:
         </nav>
 
         <div className="wallet-section">
-          {walletAddress ? (
-            <div className="wallet-connected">
-              <button 
-                className="wallet-button connected"
-                onClick={() => setShowDropdown(!showDropdown)}
-              >
-                <span className="wallet-icon">&#x1F4B3;</span>
-                {formatAddress(walletAddress)}
-              </button>
-              {showDropdown && (
-                <div className="wallet-dropdown">
-                  <button onClick={onDisconnect} className="disconnect-btn">
-                    Disconnect
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <button 
-              className="wallet-button"
-              onClick={onConnect}
-              disabled={isConnecting}
-            >
-              {isConnecting ? 'Connecting...' : 'Connect Wallet'}
-            </button>
-          )}
+          <ConnectButton />
         </div>
       </div>
     </header>
