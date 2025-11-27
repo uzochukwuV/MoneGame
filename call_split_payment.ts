@@ -29,11 +29,11 @@ async function splitPayment() {
     target: `${packageId}::payment_splitter::split_payment`,
     arguments: [
       payment,
-      tx.pure([
+      tx.pure.vector('address', [
         '0x7e6455259cd0eb227d85b0273c06d144d8b67aec78b1e6f23981df93e52d9a1b',
         '0x7e6455259cd0eb227d85b0273c06d144d8b67aec78b1e6f23981df93e52d9a1b'
       ]),
-      tx.pure([600, 400])
+      tx.pure.vector('u64', [600, 400])
     ],
   });
 

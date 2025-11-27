@@ -211,11 +211,11 @@ const tier1Event = response.data.find((event: any) =>
       target: `${this.packageId}::battle_royale::ask_question`,
       arguments: [
         tx.object(gameId),
-        tx.pure(question),
-        tx.pure(optionA),
-        tx.pure(optionB),
-        tx.pure(optionC),
-        tx.pure(myAnswer),
+        tx.pure.string(question),
+        tx.pure.string(optionA),
+        tx.pure.string(optionB),
+        tx.pure.string(optionC),
+        tx.pure.u8(myAnswer),
         tx.object(clock),
       ],
     });
@@ -237,7 +237,7 @@ const tier1Event = response.data.find((event: any) =>
 
     tx.moveCall({
       target: `${this.packageId}::battle_royale::submit_answer`,
-      arguments: [tx.object(gameId), tx.pure(choice), tx.object(clock)],
+      arguments: [tx.object(gameId), tx.pure.u8(choice), tx.object(clock)],
     });
 
     return this.executeTransaction(tx, userKeypair, gasless);
@@ -368,12 +368,12 @@ async isPlayerInGame(gameId: string, playerAddress: string): Promise<boolean> {
     target: `${this.packageId}::battle_royale::is_player_in_game`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: playerAddress,
   });
 
@@ -390,12 +390,12 @@ async isPlayerEliminated(gameId: string, playerAddress: string): Promise<boolean
     target: `${this.packageId}::battle_royale::is_player_eliminated`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: playerAddress,
   });
 
@@ -419,7 +419,7 @@ async getCurrentQuestion(gameId: string, userAddress: string): Promise<{
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: userAddress
   });
 
@@ -443,12 +443,12 @@ async hasPlayerAnswered(gameId: string, playerAddress: string): Promise<boolean>
     target: `${this.packageId}::battle_royale::has_player_answered`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: playerAddress,
   });
 
@@ -465,12 +465,12 @@ async getPlayerAnswer(gameId: string, playerAddress: string): Promise<number> {
     target: `${this.packageId}::battle_royale::get_player_answer`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: playerAddress,
   });
 
@@ -495,7 +495,7 @@ async getTimeRemaining(gameId: string, userAddress: string): Promise<number> {
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: userAddress,
   });
 
@@ -514,7 +514,7 @@ async getAnswerCount(gameId: string, userAddress: string): Promise<number> {
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: userAddress,
   });
 
@@ -544,7 +544,7 @@ async getVotingStats(gameId: string, userAddress: string): Promise<{
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: userAddress,
   });
 
@@ -569,7 +569,7 @@ async getSurvivors(gameId: string, userAddress: string): Promise<string[]> {
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: userAddress,
   });
 
@@ -586,12 +586,12 @@ async canClaimPrize(gameId: string, playerAddress: string): Promise<boolean> {
     target: `${this.packageId}::battle_royale::can_claim_prize`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
   const result = await this.client.devInspectTransactionBlock({
-    transaction: txb,
+    transactionBlock: txb,
     sender: playerAddress,
   });
 
