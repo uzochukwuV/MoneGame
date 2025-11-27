@@ -8,6 +8,8 @@ declare global {
       signAndExecuteTransaction: (params: { transaction: any }) => Promise<{ digest: string }>;
       signTransaction: (params: { transaction: any }) => Promise<{ signature: string; bytes: Uint8Array }>;
       getAccount: () => Promise<{ address: string } | null>;
+      on?: (event: string, callback: (...args: any[]) => void) => void;
+      off?: (event: string, callback: (...args: any[]) => void) => void;
     };
   }
 }
@@ -17,6 +19,13 @@ export interface WalletState {
   address: string | null;
   isConnecting: boolean;
   error: string | null;
+  balance?: string;
+}
+
+export interface TransactionResult {
+  digest: string;
+  signature?: string;
+  bytes?: Uint8Array;
 }
 
 export function useOneWallet() {
@@ -26,6 +35,7 @@ export function useOneWallet() {
     isConnecting: false,
     error: null,
   });
+  const [isTransactionExecuting, setIsTransactionExecuting] = useState(false);
 
   const checkConnection = useCallback(async () => {
     if (typeof window !== 'undefined' && window.oneWallet) {
@@ -48,6 +58,41 @@ export function useOneWallet() {
   useEffect(() => {
     checkConnection();
   }, [checkConnection]);
+
+  useEffect(() => {
+    // Set up wallet event listeners if available
+    if (typeof window === 'undefined' || !window.oneWallet?.on) {
+      return;
+    }
+
+    const handleAccountChange = (accounts: any[]) => {
+      if (accounts.length > 0) {
+        setWalletState(prev => ({
+          ...prev,
+          address: accounts[0].address,
+        }));
+      }
+    };
+
+    const handleDisconnect = () => {
+      setWalletState({
+        isConnected: false,
+        address: null,
+        isConnecting: false,
+        error: null,
+      });
+    };
+
+    window.oneWallet.on('accountsChanged', handleAccountChange);
+    window.oneWallet.on('disconnect', handleDisconnect);
+
+    return () => {
+      if (window.oneWallet?.off) {
+        window.oneWallet.off('accountsChanged', handleAccountChange);
+        window.oneWallet.off('disconnect', handleDisconnect);
+      }
+    };
+  }, []);
 
   const connect = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -104,22 +149,64 @@ export function useOneWallet() {
     });
   }, []);
 
-  const signAndExecuteTransaction = useCallback(async (transaction: any) => {
+  const signAndExecuteTransaction = useCallback(async (transaction: any): Promise<TransactionResult> => {
     if (!window.oneWallet) {
-      throw new Error('OneWallet not connected');
+      throw new Error('OneWallet not installed');
     }
 
-    const result = await window.oneWallet.signAndExecuteTransaction({
-      transaction,
-    });
+    if (!walletState.isConnected) {
+      throw new Error('Wallet not connected. Please connect your wallet first.');
+    }
 
-    return result;
-  }, []);
+    setIsTransactionExecuting(true);
+    try {
+      const result = await window.oneWallet.signAndExecuteTransaction({
+        transaction,
+      });
+
+      return result;
+    } catch (err: any) {
+      const errorMessage = err.message || 'Transaction execution failed';
+      setWalletState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
+      throw err;
+    } finally {
+      setIsTransactionExecuting(false);
+    }
+  }, [walletState.isConnected]);
+
+  const signTransaction = useCallback(async (transaction: any) => {
+    if (!window.oneWallet) {
+      throw new Error('OneWallet not installed');
+    }
+
+    if (!walletState.isConnected) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      const result = await window.oneWallet.signTransaction({
+        transaction,
+      });
+      return result;
+    } catch (err: any) {
+      const errorMessage = err.message || 'Transaction signing failed';
+      setWalletState(prev => ({
+        ...prev,
+        error: errorMessage,
+      }));
+      throw err;
+    }
+  }, [walletState.isConnected]);
 
   return {
     ...walletState,
+    isTransactionExecuting,
     connect,
     disconnect,
     signAndExecuteTransaction,
+    signTransaction,
   };
 }
