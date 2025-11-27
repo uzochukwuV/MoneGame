@@ -1,0 +1,89 @@
+NPM SDK: @mysten/sui (OneChain is a Sui-based blockchain)
+OneChain appears to be built on top of Sui blockchain technology. The documentation references the Sui TypeScript SDK throughout, which you can install via:
+bashnpm install @mysten/sui
+Key Components for Wallet Integration:
+1. Transaction Building
+typescriptimport { Transaction } from '@mysten/sui/transactions';
+
+const tx = new Transaction();
+
+// Example: Split coins and transfer
+const [coin] = tx.splitCoins(tx.gas, [tx.pure(100)]);
+tx.transferObjects([coin], tx.pure('0xRecipientAddress'));
+2. Wallet Standard Integration
+The documentation mentions Wallet Standard interface for dApp/Wallet integration:
+typescript// Within a dApp
+const tx = new Transaction();
+wallet.signTransaction({ transaction: tx });
+
+// Serialization for wallet communication
+function handleSignTransaction(input) {
+    sendToWalletContext({ 
+        transaction: input.transaction.serialize() 
+    });
+}
+
+// Within wallet context
+function handleSignRequest(input) {
+    const userTx = Transaction.from(input.transaction);
+}
+3. Client Setup
+typescriptimport { SuiClientBuilder } from '@mysten/sui';
+
+const client = SuiClientBuilder.default()
+    .build("https://rpc-testnet.onelabs.cc:443");
+How to Use It (Step-by-Step):
+Installation:
+bashnpm install @mysten/sui
+Basic Wallet Connection Pattern:
+typescriptimport { Transaction } from '@mysten/sui/transactions';
+import { SuiClient } from '@mysten/sui/client';
+
+// 1. Initialize client
+const client = new SuiClient({ 
+    url: 'https://rpc-testnet.onelabs.cc:443' 
+});
+
+// 2. Create transaction
+const tx = new Transaction();
+tx.setSender(userAddress);
+
+// 3. Add transaction logic
+const [coin] = tx.splitCoins(tx.gas, [tx.pure(amount)]);
+tx.transferObjects([coin], tx.pure(recipientAddress));
+
+// 4. Sign and execute via wallet
+await wallet.signAndExecuteTransaction({ 
+    transaction: tx 
+});
+Important Endpoints:
+
+Testnet RPC: https://rpc-testnet.onelabs.cc:443
+Devnet RPC: https://rpc-devnet.onelabs.cc:443
+Mainnet RPC: https://rpc-mainnet.onelabs.cc:443
+
+Key Features from Docs:
+
+Programmable Transaction Blocks (PTBs) - Batch multiple operations
+Gas Management - Auto coin selection and gas smashing
+Object-based Model - Everything is an object (different from account-based chains)
+Sponsored Transactions - Gasless transactions support
+
+SDK Documentation References:
+The docs mention checking the official Sui SDK documentation at https://docs.claude.com for comprehensive prompting techniques (though this seems like a placeholder reference in the docs).
+Quick Start Example:
+typescriptimport { Transaction } from '@mysten/sui/transactions';
+
+// Create PTB
+const tx = new Transaction();
+
+// Split and transfer in one block
+const [coin] = tx.splitCoins(tx.gas, [tx.pure(1000000)]); // 1 OCT
+tx.transferObjects([coin], tx.pure(recipientAddress));
+
+// Execute via connected wallet
+const result = await window.suiWallet.signAndExecuteTransaction({
+    transaction: tx,
+});
+Note: The OneChain wallet integration follows Sui's Wallet Standard, so you'll be working with similar patterns to Sui wallet integrations. The main difference is pointing to OneChain-specific RPC endpoints.
+Would you like me to create a complete example implementation or dive deeper into any specific aspect?

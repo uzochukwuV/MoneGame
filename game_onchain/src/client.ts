@@ -1,8 +1,11 @@
-import { SuiClient } from '@mysten/sui.js/client';
-import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { Ed25519Keypair } from '@mysten/sui.js/keypairs/ed25519';
+import { SuiClient } from '@mysten/sui/client';
+import { Transaction } from '@mysten/sui/transactions';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { type GameConfig, Tier, TIER_FEES,type GameInfo } from './types';
 import { GasSponsor } from './sponsor';
+
+// Default package ID for OneChain testnet
+const DEFAULT_PACKAGE_ID = '0x16d2cab2772b1fc4372cefe3a50c76bc3c18feb9b7b685f56cd7b46c9e923d0a';
 
 export class MajorityRulesClient {
   private client: SuiClient;
@@ -17,7 +20,7 @@ export class MajorityRulesClient {
         : 'https://rpc-mainnet.onelabs.cc:443');
 
     this.client = new SuiClient({ url: rpcUrl });
-    this.packageId = config.packageId;
+    this.packageId = config.packageId || DEFAULT_PACKAGE_ID;
   }
 
   /**
@@ -62,7 +65,7 @@ const tier1Event = response.data.find((event: any) =>
     userKeypair: Ed25519Keypair,
     gasless: boolean = false
   ): Promise<string> {
-    const tx = new TransactionBlock();
+    const tx = new Transaction();
     const lobbyId = await this.getTierLobby(tier);
 
     // Get clock object (shared object at 0x6)
@@ -83,7 +86,7 @@ const tier1Event = response.data.find((event: any) =>
 
       // User signs
       const txBytes = Uint8Array.from(JSON.parse(sponsoredData).txBytes);
-      const userSig = await userKeypair.signTransactionBlock(txBytes);
+      const userSig = await userKeypair.signTransaction(txBytes);
 
       // Execute with both signatures
       const result = await this.sponsor.executeSponsored(
@@ -95,9 +98,9 @@ const tier1Event = response.data.find((event: any) =>
       return result.digest;
     } else {
       // User pays gas
-      const result = await this.client.signAndExecuteTransactionBlock({
+      const result = await this.client.signAndExecuteTransaction({
         signer: userKeypair,
-        transactionBlock: tx,
+        transaction: tx,
       });
 
       return result.digest;
@@ -113,7 +116,7 @@ const tier1Event = response.data.find((event: any) =>
     userKeypair: Ed25519Keypair,
     gasless: boolean = true
   ): Promise<string> {
-    const tx = new TransactionBlock();
+    const tx = new Transaction();
     const userAddress = userKeypair.toSuiAddress();
 
     // Get required objects
@@ -153,7 +156,7 @@ const tier1Event = response.data.find((event: any) =>
       );
 
       const txBytes = Uint8Array.from(JSON.parse(sponsoredData).txBytes);
-      const userSig = await userKeypair.signTransactionBlock(txBytes);
+      const userSig = await userKeypair.signTransaction(txBytes);
 
       const result = await this.sponsor.executeSponsored(
         txBytes,
@@ -163,9 +166,9 @@ const tier1Event = response.data.find((event: any) =>
 
       return result.digest;
     } else {
-      const result = await this.client.signAndExecuteTransactionBlock({
+      const result = await this.client.signAndExecuteTransaction({
         signer: userKeypair,
-        transactionBlock: tx,
+        transaction: tx,
       });
 
       return result.digest;
@@ -180,7 +183,7 @@ const tier1Event = response.data.find((event: any) =>
     userKeypair: Ed25519Keypair,
     gasless: boolean = true
   ): Promise<string> {
-    const tx = new TransactionBlock();
+    const tx = new Transaction();
     const clock = '0x0000000000000000000000000000000000000000000000000000000000000006';
 
     tx.moveCall({
@@ -204,18 +207,18 @@ const tier1Event = response.data.find((event: any) =>
     userKeypair: Ed25519Keypair,
     gasless: boolean = true
   ): Promise<string> {
-    const tx = new TransactionBlock();
+    const tx = new Transaction();
     const clock = '0x0000000000000000000000000000000000000000000000000000000000000006';
 
     tx.moveCall({
       target: `${this.packageId}::battle_royale::ask_question`,
       arguments: [
         tx.object(gameId),
-        tx.pure(question),
-        tx.pure(optionA),
-        tx.pure(optionB),
-        tx.pure(optionC),
-        tx.pure(myAnswer),
+        tx.pure.string(question),
+        tx.pure.string(optionA),
+        tx.pure.string(optionB),
+        tx.pure.string(optionC),
+        tx.pure.u8(myAnswer),
         tx.object(clock),
       ],
     });
@@ -232,12 +235,12 @@ const tier1Event = response.data.find((event: any) =>
     userKeypair: Ed25519Keypair,
     gasless: boolean = true
   ): Promise<string> {
-    const tx = new TransactionBlock();
+    const tx = new Transaction();
     const clock = '0x0000000000000000000000000000000000000000000000000000000000000006';
 
     tx.moveCall({
       target: `${this.packageId}::battle_royale::submit_answer`,
-      arguments: [tx.object(gameId), tx.pure(choice), tx.object(clock)],
+      arguments: [tx.object(gameId), tx.pure.u8(choice), tx.object(clock)],
     });
 
     return this.executeTransaction(tx, userKeypair, gasless);
@@ -251,7 +254,7 @@ const tier1Event = response.data.find((event: any) =>
     userKeypair: Ed25519Keypair,
     gasless: boolean = true
   ): Promise<string> {
-    const tx = new TransactionBlock();
+    const tx = new Transaction();
     const clock = '0x0000000000000000000000000000000000000000000000000000000000000006';
 
     tx.moveCall({
@@ -269,7 +272,7 @@ const tier1Event = response.data.find((event: any) =>
     gameId: string,
     userKeypair: Ed25519Keypair
   ): Promise<string> {
-    const tx = new TransactionBlock();
+    const tx = new Transaction();
 
     tx.moveCall({
       target: `${this.packageId}::battle_royale::claim_prize`,
@@ -322,7 +325,7 @@ const tier1Event = response.data.find((event: any) =>
   }
 
   private async executeTransaction(
-    tx: TransactionBlock,
+    tx: Transaction,
     userKeypair: Ed25519Keypair,
     gasless: boolean
   ): Promise<string> {
@@ -334,7 +337,7 @@ const tier1Event = response.data.find((event: any) =>
       );
 
       const txBytes = Uint8Array.from(JSON.parse(sponsoredData).txBytes);
-      const userSig = await userKeypair.signTransactionBlock(txBytes);
+      const userSig = await userKeypair.signTransaction(txBytes);
 
       const result = await this.sponsor.executeSponsored(
         txBytes,
@@ -344,9 +347,9 @@ const tier1Event = response.data.find((event: any) =>
 
       return result.digest;
     } else {
-      const result = await this.client.signAndExecuteTransactionBlock({
+      const result = await this.client.signAndExecuteTransaction({
         signer: userKeypair,
-        transactionBlock: tx,
+        transaction: tx,
       });
 
       return result.digest;
@@ -362,13 +365,13 @@ const tier1Event = response.data.find((event: any) =>
  * Check if a player is in the game
  */
 async isPlayerInGame(gameId: string, playerAddress: string): Promise<boolean> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   txb.moveCall({
     target: `${this.packageId}::battle_royale::is_player_in_game`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
@@ -384,13 +387,13 @@ async isPlayerInGame(gameId: string, playerAddress: string): Promise<boolean> {
  * Check if a player is eliminated
  */
 async isPlayerEliminated(gameId: string, playerAddress: string): Promise<boolean> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   txb.moveCall({
     target: `${this.packageId}::battle_royale::is_player_eliminated`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
@@ -411,7 +414,7 @@ async getCurrentQuestion(gameId: string, userAddress: string): Promise<{
   optionB: string;
   optionC: string;
 }> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   txb.moveCall({
     target: `${this.packageId}::battle_royale::get_current_question`,
@@ -437,13 +440,13 @@ async getCurrentQuestion(gameId: string, userAddress: string): Promise<{
  * Check if player has answered current round
  */
 async hasPlayerAnswered(gameId: string, playerAddress: string): Promise<boolean> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   txb.moveCall({
     target: `${this.packageId}::battle_royale::has_player_answered`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
@@ -459,13 +462,13 @@ async hasPlayerAnswered(gameId: string, playerAddress: string): Promise<boolean>
  * Get player's answer for current round (if they answered)
  */
 async getPlayerAnswer(gameId: string, playerAddress: string): Promise<number> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   txb.moveCall({
     target: `${this.packageId}::battle_royale::get_player_answer`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 
@@ -481,7 +484,7 @@ async getPlayerAnswer(gameId: string, playerAddress: string): Promise<number> {
  * Get time remaining for current phase (in milliseconds)
  */
 async getTimeRemaining(gameId: string, userAddress: string): Promise<number> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   // Get the clock object (0x6 is the standard clock object on Sui)
   const clock = txb.object('0x6');
@@ -506,7 +509,7 @@ async getTimeRemaining(gameId: string, userAddress: string): Promise<number> {
  * Get total number of players who have voted (safe to show during voting)
  */
 async getAnswerCount(gameId: string, userAddress: string): Promise<number> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   txb.moveCall({
     target: `${this.packageId}::battle_royale::get_answer_count`,
@@ -530,7 +533,7 @@ async getVotingStats(gameId: string, userAddress: string): Promise<{
   votesB: number;
   votesC: number;
 }> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   // Get the clock object
   const clock = txb.object('0x6');
@@ -561,7 +564,7 @@ async getVotingStats(gameId: string, userAddress: string): Promise<{
  * Get list of surviving players
  */
 async getSurvivors(gameId: string, userAddress: string): Promise<string[]> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   txb.moveCall({
     target: `${this.packageId}::battle_royale::get_survivors`,
@@ -580,13 +583,13 @@ async getSurvivors(gameId: string, userAddress: string): Promise<string[]> {
  * Check if player can claim prize
  */
 async canClaimPrize(gameId: string, playerAddress: string): Promise<boolean> {
-  const txb = new TransactionBlock();
+  const txb = new Transaction();
   
   txb.moveCall({
     target: `${this.packageId}::battle_royale::can_claim_prize`,
     arguments: [
       txb.object(gameId),
-      txb.pure(playerAddress, 'address'),
+      txb.pure.address(playerAddress),
     ],
   });
 

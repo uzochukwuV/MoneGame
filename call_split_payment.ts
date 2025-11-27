@@ -1,6 +1,6 @@
-import { SuiClient } from "@mysten/sui.js/client";
-import { Ed25519Keypair } from "@mysten/sui.js/keypairs/ed25519";
-import { TransactionBlock } from "@mysten/sui.js/transactions";
+import { SuiClient } from "@mysten/sui/client";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { Transaction } from "@mysten/sui/transactions";
 import { configDotenv } from "dotenv";
 configDotenv()
 // Setup
@@ -9,7 +9,7 @@ const keypair = Ed25519Keypair.deriveKeypair(process.env.SEED!); // From `one ke
 const packageId = '0x16d2cab2772b1fc4372cefe3a50c76bc3c18feb9b7b685f56cd7b46c9e923d0a';
 
 async function splitPayment() {
-  const tx = new TransactionBlock();
+  const tx = new Transaction();
   console.log(keypair.toSuiAddress())
   const coins = await clien.getAllCoins({
     owner : keypair.toSuiAddress()
@@ -29,20 +29,20 @@ async function splitPayment() {
     target: `${packageId}::payment_splitter::split_payment`,
     arguments: [
       payment,
-      tx.pure([
+      tx.pure.vector('address', [
         '0x7e6455259cd0eb227d85b0273c06d144d8b67aec78b1e6f23981df93e52d9a1b',
         '0x7e6455259cd0eb227d85b0273c06d144d8b67aec78b1e6f23981df93e52d9a1b'
       ]),
-      tx.pure([600, 400])
+      tx.pure.vector('u64', [600, 400])
     ],
   });
 
   
   
   // Execute
-  const result = await clien.signAndExecuteTransactionBlock({
+  const result = await clien.signAndExecuteTransaction({
     signer: keypair,
-    transactionBlock: tx,
+    transaction: tx,
     
   });
   
