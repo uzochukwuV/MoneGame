@@ -535,7 +535,7 @@ function App() {
           <GameResults
             isWinner={!isEliminated}
             isEliminated={isEliminated}
-            prizePool={(gameInfo?.playerCount || 10) * TIER_FEES[selectedTier] * 1_000_000_000 * 0.95}
+            prizePool={(gameInfo?.playerCount || 10) * TIER_FEES[selectedTier] * 0.95}
             survivors={survivors}
             canClaimPrize={!isEliminated}
             onClaimPrize={handleClaimPrize}
