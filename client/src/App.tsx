@@ -9,7 +9,6 @@ import { GameResults } from './components/GameResults';
 import { Tier, GameStatus, TIER_FEES } from './types/game';
 import type { GameInfo, Question, VotingStats } from './types/game';
 import { GameDiscovery } from './components/GameDiscovery';
-import { useGameDiscovery } from './hooks/useGameDiscovery';
 import { useGameActions } from './hooks/useGameActions';
 import { GAME_PACKAGE_ID } from './config/game';
 
@@ -138,7 +137,7 @@ function App() {
     };
 
     checkActiveGame();
-  }, [isConnected, address, gameActions, clearGameSession]);
+  }, [isConnected]);
 
   // Handler for when GameLobby detects game start
   const handleGameStart = useCallback((gameData: any) => {
@@ -197,10 +196,30 @@ function App() {
               console.log('✅ [App] Question received from blockchain!');
               setQuestion({
                 question: gameData.question.text,
-                optionA: gameData.question.option_a || '',
-                optionB: gameData.question.option_b || '',
-                optionC: gameData.question.option_c || '',
+                optionA: gameData.question.optionA || '',
+                optionB: gameData.question.optionB || '',
+                optionC: gameData.question.optionC || '',
               });
+            }
+
+            // Fetch voting stats from blockchain if we have answers
+            if (gameData.answers && Object.keys(gameData.answers).length > 0 && !votingStats) {
+              console.log('📊 [App] Fetching voting results from blockchain...');
+
+              try {
+                const votingResults = await gameActions.getVotingResults(gameInfo.gameId);
+                if (votingResults) {
+                  console.log('✅ [App] Voting results received:', votingResults);
+                  setVotingStats({
+                    votesA: votingResults.votesA,
+                    votesB: votingResults.votesB,
+                    votesC: votingResults.votesC,
+                  });
+                  setAnswerCount(playerCount - eliminatedCount); // Update with actual player count
+                }
+              } catch (err) {
+                console.error('⚠️ [App] Error fetching voting results:', err);
+              }
             }
 
             // Check if game finished
@@ -319,54 +338,70 @@ function App() {
     setSelectedTier(null);
   }, []);
 
-  const handleAskQuestion = useCallback((q: Question, myAnswer: 1 | 2 | 3) => {
-    setQuestion(q);
-    setHasAnswered(true);
-    setPlayerAnswer(myAnswer);
-    setTimeRemaining(60000);
-    setAnswerCount(1);
-    setGameInfo(prev => prev ? { ...prev, questionAsked: true } : null);
-    
-    setTimeout(() => {
-      const totalPlayers = gameInfo?.playerCount || 10;
-      const votesA = Math.floor(Math.random() * totalPlayers);
-      const votesB = Math.floor(Math.random() * (totalPlayers - votesA));
-      const votesC = totalPlayers - votesA - votesB;
-      
-      setVotingStats({ votesA, votesB, votesC });
-      setAnswerCount(totalPlayers);
-      
-      const majority = votesA >= votesB && votesA >= votesC ? 1 : votesB >= votesC ? 2 : 3;
-      if (myAnswer !== majority) {
-        setIsEliminated(true);
-      }
-      
-      setTimeout(() => {
-        if (gameInfo && gameInfo.currentRound >= 3) {
-          setGamePhase('results');
-          setSurvivors([address || '']);
-        } else {
-          setGameInfo(prev => prev ? {
-            ...prev,
-            currentRound: prev.currentRound + 1,
-            eliminatedCount: prev.eliminatedCount + Math.floor(prev.playerCount * 0.3),
-          } : null);
-          setQuestion(null);
-          setHasAnswered(false);
-          setPlayerAnswer(null);
-          setVotingStats(null);
-          setTimeRemaining(120000);
-          setAnswerCount(0);
-        }
-      }, 5000);
-    }, 8000);
-  }, [gameInfo, address]);
+  const handleAskQuestion = useCallback(async (q: Question, myAnswer: 1 | 2 | 3) => {
+    if (!gameInfo || !gameActions || !isQuestioner) {
+      console.error('❌ [App] Cannot ask question: user is not questioner or game data missing');
+      return;
+    }
 
-  const handleSubmitAnswer = useCallback((choice: 1 | 2 | 3) => {
-    setHasAnswered(true);
-    setPlayerAnswer(choice);
-    setAnswerCount(prev => prev + 1);
-  }, []);
+    console.log('🎯 [App] Questioner asking question:', q.question.slice(0, 30) + '...');
+
+    try {
+      // Call blockchain to ask question
+      const txDigest = await gameActions.askQuestion(
+        gameInfo.gameId,
+        q.question,
+        q.optionA,
+        q.optionB,
+        q.optionC,
+        myAnswer
+      );
+
+      console.log('✅ [App] Question submitted to blockchain:', txDigest);
+
+      // Update local state immediately for UI feedback
+      setQuestion(q);
+      setHasAnswered(true);
+      setPlayerAnswer(myAnswer);
+      setTimeRemaining(60000); // 60 second voting timer
+
+      // Wait for blockchain indexing
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Update gameInfo to reflect question was asked
+      setGameInfo(prev => prev ? { ...prev, questionAsked: true } : null);
+      setAnswerCount(1); // Questioner already answered
+
+      console.log('📊 [App] Question posted. Waiting for other players to answer...');
+    } catch (error) {
+      console.error('❌ [App] Error asking question:', error);
+    }
+  }, [gameInfo, gameActions]);
+
+  const handleSubmitAnswer = useCallback(async (choice: 1 | 2 | 3) => {
+    if (!gameInfo || !gameActions || hasAnswered) {
+      console.error('❌ [App] Cannot submit answer: already answered or game data missing');
+      return;
+    }
+
+    console.log('🗳️ [App] Player submitting answer:', choice);
+
+    try {
+      // Call blockchain to submit answer
+      const txDigest = await gameActions.submitAnswer(gameInfo.gameId, choice);
+
+      console.log('✅ [App] Answer submitted to blockchain:', txDigest);
+
+      // Update local state immediately for UI feedback
+      setHasAnswered(true);
+      setPlayerAnswer(choice);
+      setAnswerCount(prev => prev + 1);
+
+      console.log('📊 [App] Answer locked in. Waiting for voting to complete...');
+    } catch (error) {
+      console.error('❌ [App] Error submitting answer:', error);
+    }
+  }, [gameInfo, gameActions, hasAnswered]);
 
   const handleLeaveGame = useCallback(() => {
     console.log('👋 [App] Leaving game');
@@ -500,7 +535,7 @@ function App() {
           <GameResults
             isWinner={!isEliminated}
             isEliminated={isEliminated}
-            prizePool={(gameInfo?.playerCount || 10) * TIER_FEES[selectedTier] * 1_000_000_000 * 0.95}
+            prizePool={(gameInfo?.playerCount || 10) * TIER_FEES[selectedTier] * 0.95}
             survivors={survivors}
             canClaimPrize={!isEliminated}
             onClaimPrize={handleClaimPrize}

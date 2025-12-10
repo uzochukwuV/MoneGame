@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Tier, TIER_NAMES, TIER_FEES, GameStatus } from '../types/game';
-import { useSuiClient } from '@mysten/dapp-kit';
+import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useGameActions } from '../hooks/useGameActions';
 
 interface GameLobbyProps {
   tier: Tier;
@@ -13,9 +14,12 @@ interface GameLobbyProps {
 export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: GameLobbyProps) {
   const minPlayers = 10;
   const suiClient = useSuiClient();
+  const currentAccount = useCurrentAccount();
+  const gameActions = useGameActions({ packageId });
+
   const [playerCount, setPlayerCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
 
   // Poll for game updates
   useEffect(() => {
@@ -56,7 +60,6 @@ export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: Gam
 
         // Update player count
         setPlayerCount(newPlayerCount);
-        setIsLoading(false);
 
         // If game has started (status changed to ACTIVE or 10+ players), notify parent ONLY ONCE
         if (!gameStarted && (newPlayerCount >= minPlayers || gameStatus === GameStatus.ACTIVE)) {
@@ -86,12 +89,64 @@ export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: Gam
 
     // Poll immediately, then every 2 seconds
     pollGame();
-    const interval = setInterval(pollGame, 2000);
+    const interval = setInterval(pollGame, 200000);
 
     return () => {
       clearInterval(interval);
     };
   }, [gameId, suiClient, packageId, onGameStart, gameStarted]);
+
+  // Handle manual game start
+  const handleStartGame = useCallback(async () => {
+    if (!currentAccount || !gameActions || playerCount < minPlayers) return;
+
+    setIsStarting(true);
+    console.log('🎮 [GameLobby] Starting game manually...');
+
+    try {
+      // Call blockchain startGame function
+      const txDigest = await gameActions.startGame(gameId);
+      console.log('✅ [GameLobby] Game start transaction sent:', txDigest);
+
+      // Fetch updated game data to confirm status change
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait for indexing
+
+      const gameObject = await suiClient.getObject({
+        id: gameId,
+        options: {
+          showContent: true,
+          showType: true,
+        },
+      });
+
+      if (gameObject.data?.content && gameObject.data.content.dataType === 'moveObject') {
+        const fields = gameObject.data.content.fields as any;
+        const newPlayerCount = (fields.players || []).length;
+        const eliminatedCount = (fields.eliminated || []).length;
+        const gameStatus = fields.status || GameStatus.WAITING;
+        const currentRound = fields.current_round || 0;
+
+        console.log('✅ [GameLobby] Game started! Status updated on blockchain');
+        console.log('   - Players:', newPlayerCount);
+        console.log('   - Status:', gameStatus);
+
+        // Notify parent with updated game data
+        onGameStart({
+          status: gameStatus,
+          currentRound,
+          playerCount: newPlayerCount,
+          eliminatedCount,
+          prizePool: fields.prize_pool || '0',
+          currentQuestioner: fields.current_questioner || '',
+          question: fields.question || null,
+        });
+      }
+    } catch (error) {
+      console.error('❌ [GameLobby] Error starting game:', error);
+    } finally {
+      setIsStarting(false);
+    }
+  }, [currentAccount, gameActions, playerCount, gameId, suiClient, onGameStart]);
 
   const progress = Math.min((playerCount / minPlayers) * 100, 100);
 
@@ -143,6 +198,17 @@ export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: Gam
             <span></span>
             <span></span>
           </div>
+
+          {playerCount >= minPlayers && (
+            <button
+              className="submit-button"
+              onClick={handleStartGame}
+              disabled={isStarting}
+              style={{ marginBottom: '1rem', width: '100%' }}
+            >
+              {isStarting ? '⟳ Starting Game...' : '🚀 Start Game'}
+            </button>
+          )}
 
           <button className="back-button" onClick={onLeave}>
             Leave Lobby

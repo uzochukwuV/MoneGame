@@ -1,4 +1,4 @@
-export enum Tier {
+export const enum Tier {
   TIER_1 = 1,
   TIER_2 = 2,
   TIER_3 = 3,
@@ -6,12 +6,13 @@ export enum Tier {
   TIER_5 = 5,
 }
 
+// TIER_FEES in MIST (1 OCT = 1 billion MIST)
 export const TIER_FEES: Record<Tier, number> = {
-  [Tier.TIER_1]: 0.01,
-  [Tier.TIER_2]: 0.1,
-  [Tier.TIER_3]: 1,
-  [Tier.TIER_4]: 10,
-  [Tier.TIER_5]: 100,
+  [Tier.TIER_1]: 10_000_000,       // 0.01 OCT
+  [Tier.TIER_2]: 100_000_000,      // 0.1 OCT
+  [Tier.TIER_3]: 1_000_000_000,    // 1 OCT
+  [Tier.TIER_4]: 10_000_000_000,   // 10 OCT
+  [Tier.TIER_5]: 100_000_000_000,  // 100 OCT
 };
 
 export const TIER_NAMES: Record<Tier, string> = {
@@ -22,7 +23,7 @@ export const TIER_NAMES: Record<Tier, string> = {
   [Tier.TIER_5]: 'Whale',
 };
 
-export enum GameStatus {
+export const enum GameStatus {
   WAITING = 0,
   ACTIVE = 1,
   FINISHED = 2,

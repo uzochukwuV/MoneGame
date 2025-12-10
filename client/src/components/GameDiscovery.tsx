@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { Tier, GameStatus, TIER_NAMES, TIER_FEES } from '../types/game';
+import { Tier, TIER_NAMES, TIER_FEES } from '../types/game';
 import { useGameDiscovery } from '../hooks/useGameDiscovery';
 import type { AvailableGame, GameSortBy } from '../types/discovery';
 import '../styles/game-discovery.css';
@@ -37,7 +37,7 @@ export function GameDiscovery({
   }, [tier]);
 
   // Hooks
-  const { games, isLoading, error, getGamesByTier, filterGames } =
+  const { games, isLoading, error, getGamesByTier } =
     useGameDiscovery();
 
   // State

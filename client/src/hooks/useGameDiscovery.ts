@@ -148,7 +148,7 @@ export function useGameDiscovery({
             return val || 0;
           };
 
-          const game = {
+          const game: AvailableGame = {
             gameId,
             tier: parseNum(fields.tier) as Tier,
             status: status as GameStatus,
@@ -158,7 +158,7 @@ export function useGameDiscovery({
             entryFee: fields.entry_fee?.toString() || '0',
             currentRound: parseNum(fields.current_round),
             eliminatedCount: eliminated.length,
-            createdAt: gameCreatedEvents.data[index]?.timestampMs,
+            createdAt: gameCreatedEvents.data[index]?.timestampMs ? Number(gameCreatedEvents.data[index]?.timestampMs) : undefined,
           };
 
           console.log(`🎮 [useGameDiscovery] Processed game:`, {
@@ -171,7 +171,11 @@ export function useGameDiscovery({
           return game;
         })
         .filter((game): game is AvailableGame => game !== null)
-        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); // Sort by newest first
+        .sort((a, b) => {
+          const aTime = a.createdAt || 0;
+          const bTime = b.createdAt || 0;
+          return bTime - aTime;
+        }); // Sort by newest first
 
       console.log('📈 [useGameDiscovery] FINAL RESULT:', {
         totalWaitingGames: availableGames.length,

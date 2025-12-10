@@ -126,7 +126,10 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     }
   }, [currentAccount, packageId, signAndExecute, getTierLobby]);
 
- const joinGame = useCallback(async (gameId: string, tier: Tier) => {
+
+
+
+  const joinGame = useCallback(async (gameId: string, tier: Tier) => {
   if (!currentAccount) {
     throw new Error('Wallet not connected');
   }
@@ -143,39 +146,70 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     const lobbyId = await getTierLobby(tier);
     const treasuryId = await getPlatformTreasury();
 
-    // Get user's OCT coins for entry fee
-
-    const coins = await suiClient.getAllCoins({ 
+    // Get user's OCT coins
+    const coins = await suiClient.getAllCoins({
       owner: userAddress,
-      
     });
-    
-   console.log(coins.data)
 
-    console.log('✅ Found OCT coins:', coins.data.length);
+    console.log('📊 Total coins found:', coins.data.length);
+
+    if (!coins.data || coins.data.length === 0) {
+      throw new Error('No coins found. Please ensure you have OCT in your wallet.');
+    }
+
+    // Get the entry fee required
+    const entryFeeMIST = TIER_FEES[tier];
+    const entryFeeOCT = entryFeeMIST / 1_000_000_000;
+    console.log('💰 Entry fee required:', entryFeeOCT, 'OCT =', entryFeeMIST, 'MIST');
+
+    // Sort coins by balance (largest first)
+    const sortedCoins = coins.data.sort((a, b) => 
+      Number(BigInt(b.balance) - BigInt(a.balance))
+    );
+
+    // Use the largest coin for gas
+    const gasCoin = sortedCoins[0]!;
+    const gasBalance = BigInt(gasCoin.balance);
+    const totalNeededMIST = BigInt(entryFeeMIST) + BigInt(10_000_000); // entry + gas
+
+    if (gasBalance < totalNeededMIST) {
+      const availableOCT = Number(gasBalance) / 1_000_000_000;
+      const neededOCT = Number(totalNeededMIST) / 1_000_000_000;
+      throw new Error(
+        `Insufficient balance. Have ${availableOCT.toFixed(4)} OCT, need ${neededOCT.toFixed(4)} OCT`
+      );
+    }
+
+    console.log('✅ Using coin for gas:', gasCoin.coinObjectId.slice(0, 8) + '...');
 
     // Create transaction
     const tx = new Transaction();
 
-    // Split entry fee from user's first coin
-    const entryFeeMIST = TIER_FEES[tier] * 1_000_000_000; // Convert to MIST
-    console.log('💰 Entry fee:', TIER_FEES[tier], 'OCT =', entryFeeMIST, 'MIST');
+    // Set gas payment explicitly (like the working example)
+    tx.setGasPayment([{
+      digest: gasCoin.digest,
+      objectId: gasCoin.coinObjectId,
+      version: gasCoin.version,
+    }]);
 
-    const [paymentCoin] = tx.splitCoins(tx.object(coins.data[0]!.coinObjectId), [
-      entryFeeMIST,
-    ]);
+    // Split entry fee from gas coin (like the working example)
+    const [paymentCoin] = tx.splitCoins(tx.gas, [entryFeeMIST]);
 
-    console.log('🎯 Split payment coin, calling join_game...');
+    console.log('🎯 Calling join_game...');
+    console.log('   - Lobby:', lobbyId.slice(0, 8) + '...');
+    console.log('   - Game:', gameId.slice(0, 8) + '...');
+    console.log('   - Treasury:', treasuryId.slice(0, 8) + '...');
+    console.log('   - Payment: split from gas with', entryFeeMIST, 'MIST');
 
-    // Call join_game with type argument for OCT
+    // Call join_game
     tx.moveCall({
       target: `${packageId}::battle_royale::join_game`,
       arguments: [
-        tx.object(lobbyId),
-        tx.object(gameId),
-        tx.object(treasuryId),
-        paymentCoin,
-        tx.object(CLOCK_OBJECT),
+        tx.object(lobbyId),       // lobby: &TierLobby
+        tx.object(gameId),         // game: &mut Game
+        tx.object(treasuryId),     // treasury: &mut PlatformTreasury
+        paymentCoin,               // payment: Coin<OCT>
+        tx.object(CLOCK_OBJECT),   // clock: &Clock
       ],
     });
 
@@ -189,13 +223,23 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : 'Failed to join game';
     console.error('❌ Join game error:', errorMsg);
+    console.error('Full error:', err);
     setError(errorMsg);
     throw err;
   } finally {
     setIsLoading(false);
   }
 }, [currentAccount, packageId, signAndExecute, suiClient, getTierLobby, getPlatformTreasury]);
-  const askQuestion = useCallback(async (
+
+
+
+
+
+
+
+
+
+const askQuestion = useCallback(async (
     gameId: string,
     question: string,
     optionA: string,
@@ -211,6 +255,13 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     setError(null);
 
     try {
+      console.log('🎯 [useGameActions] Asking question with:');
+      console.log('   - gameId:', gameId);
+      console.log('   - question:', question);
+      console.log('   - options:', optionA, optionB, optionC);
+      console.log('   - myAnswer:', myAnswer);
+      console.log('   - currentUser:', currentAccount.address);
+
       const tx = new Transaction();
 
       tx.moveCall({
@@ -222,22 +273,71 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
           tx.pure.string(optionB),
           tx.pure.string(optionC),
           tx.pure.u8(myAnswer),
+          tx.object(CLOCK_OBJECT),
         ],
       });
 
+      console.log('📤 [useGameActions] Sending ask_question transaction...');
       const result = await signAndExecute({
         transaction: tx,
       });
 
+      console.log('✅ [useGameActions] Ask question successful!');
+      console.log('   - Digest:', result.digest);
       return result.digest;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to ask question';
+      console.error('❌ [useGameActions] Ask question failed:');
+      console.error('   - Error:', errorMsg);
+      console.error('   - Full error:', err);
       setError(errorMsg);
       throw err;
     } finally {
       setIsLoading(false);
     }
   }, [currentAccount, packageId, signAndExecute]);
+
+  const startGame = useCallback(async (gameId: string) => {
+  if (!currentAccount) {
+    throw new Error('Wallet not connected');
+  }
+
+  setIsLoading(true);
+  setError(null);
+
+  try {
+    console.log('🚀 Starting game:', gameId.slice(0, 8) + '...');
+
+    // Create transaction
+    const tx = new Transaction();
+
+    // Call start_game
+    tx.moveCall({
+      target: `${packageId}::battle_royale::start_game`,
+      arguments: [
+        tx.object(gameId),
+        tx.object(CLOCK_OBJECT),
+      ],
+    });
+
+    console.log('📤 Executing start game transaction...');
+    const result = await signAndExecute({
+      transaction: tx,
+    });
+
+    console.log('✅ Successfully started game! Digest:', result.digest);
+    return result.digest;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : 'Failed to start game';
+    console.error('❌ Start game error:', errorMsg);
+    setError(errorMsg);
+    throw err;
+  } finally {
+    setIsLoading(false);
+  }
+}, [currentAccount, packageId, signAndExecute]);
+
+
 
   const submitAnswer = useCallback(async (gameId: string, choice: 1 | 2 | 3) => {
     if (!currentAccount) {
@@ -255,6 +355,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
         arguments: [
           tx.object(gameId),
           tx.pure.u8(choice),
+          tx.object(CLOCK_OBJECT),
         ],
       });
 
@@ -262,9 +363,11 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
         transaction: tx,
       });
 
+      console.log('✅ [useGameActions] Submit answer successful. Digest:', result.digest);
       return result.digest;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to submit answer';
+      console.error('❌ [useGameActions] Submit answer error:', errorMsg);
       setError(errorMsg);
       throw err;
     } finally {
@@ -450,7 +553,7 @@ export function useGameActions({ packageId }: UseGameActionsProps) {
     // Helpers
     getTierLobby,
     getPlatformTreasury,
-
+    startGame,
     // State
     isLoading,
     error,
