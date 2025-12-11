@@ -1,4 +1,6 @@
 interface GameResultsProps {
+  gameInfo: any;
+  address: any;
   isWinner: boolean;
   isEliminated: boolean;
   prizePool: number;
@@ -6,21 +8,34 @@ interface GameResultsProps {
   canClaimPrize: boolean;
   onClaimPrize: () => void;
   onPlayAgain: () => void;
+  handleNextgame: () => void;
 }
 
 export function GameResults({
+  gameInfo,
+  address,
   isWinner,
   isEliminated,
   prizePool,
   survivors,
   canClaimPrize,
   onClaimPrize,
-  onPlayAgain
+  onPlayAgain,
+  handleNextgame
+
 }: GameResultsProps) {
   const prizePerWinner = survivors.length > 0 ? prizePool / survivors.length : 0;
   const prizeInOCT = prizePerWinner / 1_000_000_000;
 
-  return (
+
+  if (gameInfo.eliminated.includes(address)){
+    return <div>
+      You have been eliminated
+    </div>
+
+  }
+
+  if (gameInfo.status == 2) return (
     <div className="game-container">
       <div className="game-card">
         <div className="results-section">
@@ -82,4 +97,13 @@ export function GameResults({
       </div>
     </div>
   );
+
+
+  return <div>
+    
+
+     <button className="back-button" onClick={handleNextgame}>
+            Next Session {gameInfo.current_round}
+          </button>
+  </div>
 }

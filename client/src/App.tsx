@@ -156,7 +156,11 @@ function App() {
       currentQuestioner: gameData.currentQuestioner,
       questionAsked: gameData.question?.text ? true : false,
     } : null);
-
+    console.log('🎮 [App] GameLobby notified of game start');
+    console.log('   - Players:', gameInfo?.gameId);
+    console.log('   - Status:', gameData.status);
+    gameActions.startGame(gameInfo?.gameId!)
+    
     // Transition to active phase
     console.log('✅ [App] Transitioning to active game phase');
     setGamePhase('active');
@@ -172,7 +176,7 @@ function App() {
         try {
           // Fetch fresh game data from blockchain
           const gameData = await gameActions.getGameInfo(gameInfo.gameId);
-
+          console.log(gameData)
           if (gameData) {
             const playerCount = gameData.players.length;
             const eliminatedCount = gameData.eliminated.length;
@@ -190,7 +194,7 @@ function App() {
               currentQuestioner: gameData.currentQuestioner,
               questionAsked: gameData.question?.text ? true : false,
             } : null);
-
+            console.log(gameData)
             // If question was asked and we haven't shown it yet, update the question
             if (gameData.question?.text && !question) {
               console.log('✅ [App] Question received from blockchain!');
@@ -419,6 +423,22 @@ function App() {
     setSurvivors([]);
   }, [clearGameSession]);
 
+  const handleNextgame = ()=>{
+     console.log('👋 [App] Leaving game');
+   
+    setGamePhase('active');
+    setQuestion(null);
+    setHasAnswered(false);
+    setPlayerAnswer(null);
+    setTimeRemaining(60000);
+    setAnswerCount(0);
+    setVotingStats(null);
+    setIsEliminated(false);
+    setSurvivors([]);
+  }
+
+
+ 
   const handleClaimPrize = useCallback(() => {
     console.log('Claiming prize...');
     handleLeaveGame();
@@ -515,7 +535,7 @@ function App() {
           />
         )}
 
-        {gamePhase === 'active' && gameInfo && address && gameInfo.status === GameStatus.ACTIVE && (
+        {gamePhase === 'active' && gameInfo && (
           <ActiveGame
             gameInfo={gameInfo}
             question={question}
@@ -528,11 +548,20 @@ function App() {
             onAskQuestion={handleAskQuestion}
             onSubmitAnswer={handleSubmitAnswer}
             onLeave={handleLeaveGame}
+            finaliseRound={()=> {
+              gameActions.finaliseRound(gameInfo.gameId)
+              setGamePhase("results")
+            }}
+            startGame={()=>{
+              gameActions.startGame(gameInfo.gameId)
+            }}
           />
         )}
 
         {gamePhase === 'results' && selectedTier && (
           <GameResults
+          gameInfo={gameInfo}
+          address={address}
             isWinner={!isEliminated}
             isEliminated={isEliminated}
             prizePool={(gameInfo?.playerCount || 10) * TIER_FEES[selectedTier] * 0.95}
@@ -540,6 +569,7 @@ function App() {
             canClaimPrize={!isEliminated}
             onClaimPrize={handleClaimPrize}
             onPlayAgain={handleLeaveGame}
+            handleNextgame={handleNextgame}
           />
         )}
 

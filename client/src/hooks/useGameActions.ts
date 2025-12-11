@@ -422,7 +422,25 @@ const askQuestion = useCallback(async (
       }
 
       const fields = object.data.content.fields as any;
+      console.log(fields, "jsvajsvjhavsjhvhAVHAVSjsvjhAVHJSVajhvhjaVJHVjhavjsHJAVSHJavshvHAVSJHvhvsAH")
 
+      console.log({
+        gameId,
+        tier: fields.tier || 0,
+        status: fields.status || 0,
+        currentRound: fields.current_round || 0,
+        players: fields.players || [],
+        eliminated: fields.eliminated || [],
+        prizePool: fields.prize_pool || '0',
+        currentQuestioner: fields.current_questioner || '',
+        question: fields.question_text ? {
+          text: fields.question_text || '',
+          optionA: fields.option_a || '',
+          optionB: fields.option_b || '',
+          optionC: fields.option_c || '',
+        } : null,
+        answers: fields.player_answers || {},
+      })
       return {
         gameId,
         tier: fields.tier || 0,
@@ -432,13 +450,13 @@ const askQuestion = useCallback(async (
         eliminated: fields.eliminated || [],
         prizePool: fields.prize_pool || '0',
         currentQuestioner: fields.current_questioner || '',
-        question: fields.question ? {
-          text: fields.question.text || '',
-          optionA: fields.question.option_a || '',
-          optionB: fields.question.option_b || '',
-          optionC: fields.question.option_c || '',
+        question: fields.question_text ? {
+          text: fields.question_text || '',
+          optionA: fields.option_a || '',
+          optionB: fields.option_b || '',
+          optionC: fields.option_c || '',
         } : null,
-        answers: fields.answers || {},
+        answers: fields.player_answers || {},
       };
     } catch (err) {
       console.error('Failed to get game info:', err);
@@ -523,6 +541,26 @@ const askQuestion = useCallback(async (
     };
   }, [getGameInfo]);
 
+
+  const finaliseRound = useCallback(async (gameId: string) => {
+    const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${packageId}::battle_royale::finalize_round`,
+        arguments: [
+          tx.object(gameId),
+          tx.object(CLOCK_OBJECT),
+        ],
+      });
+
+      const result = await signAndExecute({
+        transaction: tx,
+      });
+      return result.digest;
+  }, [suiClient, packageId]);
+
+
+
   const canClaimPrize = useCallback(async (gameId: string, playerAddress: string) => {
     const gameData = await getGameInfo(gameId);
     if (!gameData) return false;
@@ -541,7 +579,7 @@ const askQuestion = useCallback(async (
     askQuestion,
     submitAnswer,
     claimPrize,
-
+    finaliseRound,
     // Getters
     getGameInfo,
     getPlayerStatus,

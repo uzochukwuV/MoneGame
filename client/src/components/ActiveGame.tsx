@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { GameInfo, Question, VotingStats } from '../types/game';
 import { Tier, TIER_NAMES, GameStatus } from '../types/game';
 
@@ -14,6 +14,8 @@ interface ActiveGameProps {
   onAskQuestion: (question: Question, answer: 1 | 2 | 3) => void;
   onSubmitAnswer: (choice: 1 | 2 | 3) => void;
   onLeave: () => void;
+  finaliseRound: ()=> void;
+  startGame: ()=> void;
 }
 
 export function ActiveGame({
@@ -27,7 +29,9 @@ export function ActiveGame({
   votingStats,
   onAskQuestion,
   onSubmitAnswer,
-  onLeave
+  onLeave,
+  finaliseRound,
+  startGame
 }: ActiveGameProps) {
   const [selectedAnswer, setSelectedAnswer] = useState<1 | 2 | 3 | null>(null);
   const [questionForm, setQuestionForm] = useState({
@@ -44,6 +48,8 @@ export function ActiveGame({
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+ 
 
   const handleSubmitQuestion = () => {
     if (questionForm.question && questionForm.optionA && questionForm.optionB && questionForm.optionC && questionForm.myAnswer) {
@@ -91,6 +97,8 @@ export function ActiveGame({
     return classes;
   };
 
+  
+
   return (
     <div className="game-container">
       <div className="game-card">
@@ -106,6 +114,7 @@ export function ActiveGame({
             <span className="round-badge">Round {gameInfo.currentRound}/3</span>
             <div className="timer">
               <span className="timer-display">{formatTime(timeRemaining)}</span>
+              <button onClick={finaliseRound} className='answer-option'>Finalise Round</button>
             </div>
           </div>
         </div>
@@ -193,7 +202,7 @@ export function ActiveGame({
           <div className="question-section pending-question-dialog">
             <div className="pending-dialog-content">
               <div className="pending-icon">⏳</div>
-              <h3 className="pending-title">Waiting for Question</h3>
+              <h3 className="pending-title">Waiting for Question {question}</h3>
               <p className="pending-questioner">
                 Questioner: <span className="questioner-address">{gameInfo.currentQuestioner?.slice(0, 12)}...</span>
               </p>
@@ -259,6 +268,7 @@ export function ActiveGame({
             <p style={{ color: 'var(--text-secondary)', marginTop: '1.5rem' }}>
               Game is loading...
             </p>
+            <button className='back-button' onClick={startGame}>Start game</button>
           </div>
         )}
 

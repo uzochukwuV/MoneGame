@@ -12,7 +12,7 @@ interface GameLobbyProps {
 }
 
 export function GameLobby({ tier, gameId, packageId, onLeave, onGameStart }: GameLobbyProps) {
-  const minPlayers = 10;
+  const minPlayers = 2;
   const suiClient = useSuiClient();
   const currentAccount = useCurrentAccount();
   const gameActions = useGameActions({ packageId });
