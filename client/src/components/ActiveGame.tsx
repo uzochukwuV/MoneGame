@@ -77,25 +77,25 @@ export function ActiveGame({
   };
 
   const getOptionClass = (optionNum: 1 | 2 | 3) => {
-    let classes = 'option-button';
-    
-    if (hasAnswered && playerAnswer === optionNum) {
-      classes += ' selected';
-    } else if (selectedAnswer === optionNum) {
-      classes += ' selected';
+  let classes = 'option-button';
+  
+  // Add selected class if this option was selected
+  if ((hasAnswered && playerAnswer === optionNum) || selectedAnswer === optionNum) {
+    classes += ' selected';
+  }
+  
+  // Only apply correct/wrong classes if we have voting stats and the user has answered
+  if (votingStats && hasAnswered) {
+    const majority = getMajorityAnswer();
+    if (majority === optionNum) {
+      classes += ' correct';
+    } else if (playerAnswer === optionNum) {
+      classes += ' wrong';
     }
-    
-    if (votingStats) {
-      const majority = getMajorityAnswer();
-      if (optionNum === majority) {
-        classes += ' correct';
-      } else if (playerAnswer === optionNum && optionNum !== majority) {
-        classes += ' wrong';
-      }
-    }
-    
-    return classes;
-  };
+  }
+  
+  return classes;
+};
 
   
 

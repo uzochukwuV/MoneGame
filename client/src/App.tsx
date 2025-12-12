@@ -140,14 +140,16 @@ function App() {
   }, [isConnected]);
 
   // Handler for when GameLobby detects game start
-  const handleGameStart = useCallback((gameData: any) => {
-    console.log('🎮 [App] GameLobby notified of game start');
-    console.log('   - Players:', gameData.playerCount);
-    console.log('   - Status:', gameData.status);
+// In App.tsx, update the handleGameStart function
+const handleGameStart = useCallback(async (gameData: any) => {
+  console.log('🎮 [App] GameLobby notified of game start');
+  console.log('   - Players:', gameData.playerCount);
+  console.log('   - Status:', gameData.status);
 
+  try {
     // Update game info with fresh data from GameLobby
-    setGameInfo(prev => prev ? {
-      ...prev,
+    const updatedGameInfo = {
+      ...gameInfo!,
       status: gameData.status,
       currentRound: gameData.currentRound,
       playerCount: gameData.playerCount,
@@ -155,17 +157,30 @@ function App() {
       prizePool: Number(gameData.prizePool) / 1_000_000_000,
       currentQuestioner: gameData.currentQuestioner,
       questionAsked: gameData.question?.text ? true : false,
-    } : null);
-    console.log('🎮 [App] GameLobby notified of game start');
-    console.log('   - Players:', gameInfo?.gameId);
-    console.log('   - Status:', gameData.status);
-    gameActions.startGame(gameInfo?.gameId!)
+    };
+
+    setGameInfo(updatedGameInfo);
+    
+    // Start the game on the blockchain
+    if (gameActions && gameInfo?.gameId) {
+      await gameActions.startGame(gameInfo.gameId);
+    }
+
+    // Reset game state
+    setQuestion(null);
+    setHasAnswered(false);
+    setPlayerAnswer(null);
+    setVotingStats(null);
+    setAnswerCount(0);
     
     // Transition to active phase
     console.log('✅ [App] Transitioning to active game phase');
     setGamePhase('active');
     setTimeRemaining(120000);
-  }, []);
+  } catch (error) {
+    console.error('❌ [App] Error starting game:', error);
+  }
+}, [gameInfo, gameActions]);
 
   // Poll game data during active phase
   useEffect(() => {
@@ -224,6 +239,13 @@ function App() {
               } catch (err) {
                 console.error('⚠️ [App] Error fetching voting results:', err);
               }
+            }
+
+            // In the pollActiveGame function within the useEffect
+            if (gameData.answers) {
+              const answerCount = Object.keys(gameData.answers).length;
+              setAnswerCount(answerCount);
+              console.log(`📊 [App] ${answerCount}/${playerCount - eliminatedCount} players answered`);
             }
 
             // Check if game finished
@@ -537,6 +559,7 @@ function App() {
 
         {gamePhase === 'active' && gameInfo && (
           <ActiveGame
+            key={`${gameInfo.gameId}-${gameInfo.currentRound}`} // Add this line
             gameInfo={gameInfo}
             question={question}
             isQuestioner={isQuestioner}
