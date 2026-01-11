@@ -44,12 +44,12 @@ function getSponsorKeypair(): Ed25519Keypair {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { transactionBytes, sender } = body;
+    const { transactionKindBytes, sender } = body;
 
     // Validate request
-    if (!transactionBytes || !sender) {
+    if (!transactionKindBytes || !sender) {
       return NextResponse.json(
-        { error: 'Missing transactionBytes or sender address' },
+        { error: 'Missing transactionKindBytes or sender address' },
         { status: 400 }
       );
     }
@@ -67,29 +67,50 @@ export async function POST(req: NextRequest) {
     // Initialize Sui client
     const client = getSuiClient();
 
-    // Deserialize the transaction from the serialized bytes
-    const txBytes = fromBase64(transactionBytes);
-    const tx = Transaction.from(txBytes);
+    // STEP 1: Deserialize transaction KIND (not full transaction)
+    // Transaction.fromKind() creates a transaction from just the command bytes
+    const txKindBytesArray = new Uint8Array(transactionKindBytes);
+    const tx = Transaction.fromKind(txKindBytesArray);
 
-    // Set the sender and sponsor (gas owner)
+    // STEP 2: Set the sender and gas owner (sponsor)
     tx.setSender(sender);
     tx.setGasOwner(sponsorAddress);
 
-    // Build the transaction to get gas estimation and select gas coins
-    await tx.build({ client });
-
-    // Sign the transaction with both user (for execution) and sponsor (for gas)
-    const { bytes, signature: sponsorSignature } = await tx.sign({
-      client,
-      signer: sponsorKeypair,
+    // STEP 3: Get sponsor's coins for gas payment
+    const sponsorCoins = await client.getAllCoins({
+      owner: sponsorAddress,
     });
 
-    // Return the signed transaction data
+    if (sponsorCoins.data.length === 0) {
+      throw new Error('Sponsor has no coins for gas');
+    }
+
+    // Use the first coin as gas payment
+    const gasCoin = sponsorCoins.data[0];
+    tx.setGasPayment([
+      {
+        objectId: gasCoin.coinObjectId,
+        version: gasCoin.version,
+        digest: gasCoin.digest,
+      },
+    ]);
+
+    // STEP 4: Set gas budget (50 million MIST = 0.05 OCT)
+    tx.setGasBudget(50_000_000);
+
+    // STEP 5: Build and SIGN the transaction with sponsor keypair
+    const builtTxBytes = await tx.build({ client });
+    const sponsorSignature = await sponsorKeypair.signTransaction(builtTxBytes);
+
+    console.log('Transaction sponsored and signed by:', sponsorAddress);
+
+    // STEP 6: Return the sponsored transaction bytes AND sponsor signature
+    // Frontend will also sign this same transaction, then execute with both signatures
     return NextResponse.json({
       success: true,
-      signedTransaction: {
-        transactionBlockBytes: bytes,
-        signature: sponsorSignature,
+      sponsoredTransaction: {
+        bytes: sponsorSignature.bytes, // Already a base64 string from signTransaction
+        signature: sponsorSignature.signature,
         sponsor: sponsorAddress,
       },
     });

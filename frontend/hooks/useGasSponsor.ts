@@ -1,14 +1,17 @@
-import { useCurrentAccount, useSuiClient, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+import { useCurrentAccount, useSuiClient, useSignTransaction, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
-import { toBase64 } from '@mysten/sui/utils';
+import { fromBase64 } from '@mysten/sui/utils';
 import { useCallback } from 'react';
 
 /**
- * Gas Sponsorship Hook
+ * Gas Sponsorship Hook (Dual-Signature Pattern)
  *
- * This hook wraps transaction execution with gas sponsorship functionality.
- * It sends transactions to the backend sponsor endpoint, which signs them
- * with the sponsor wallet to pay for gas.
+ * This hook implements the official Mysten Labs sponsored transaction pattern:
+ * 1. Build transaction KIND only (no gas config)
+ * 2. Backend deserializes with Transaction.fromKind()
+ * 3. Backend sets gas owner, gas payment, builds and SIGNS
+ * 4. Frontend signs the same transaction
+ * 5. Execute with BOTH signatures (user + sponsor)
  *
  * Usage:
  * const { executeWithSponsor, isSponsored } = useGasSponsor();
@@ -25,8 +28,8 @@ interface SponsoredTransactionResult {
 
 interface SponsorResponse {
   success: boolean;
-  signedTransaction?: {
-    transactionBlockBytes: Uint8Array;
+  sponsoredTransaction?: {
+    bytes: string;
     signature: string;
     sponsor: string;
   };
@@ -37,6 +40,7 @@ interface SponsorResponse {
 export function useGasSponsor() {
   const client = useSuiClient();
   const currentAccount = useCurrentAccount();
+  const { mutateAsync: signTransaction } = useSignTransaction();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
   // Check if gas sponsorship is enabled
@@ -44,7 +48,7 @@ export function useGasSponsor() {
     return process.env.NEXT_PUBLIC_GAS_SPONSORSHIP_ENABLED === 'true';
   }, []);
 
-  // Execute transaction with gas sponsorship
+  // Execute transaction with gas sponsorship (Dual-Signature Pattern)
   const executeWithSponsor = useCallback(async (
     tx: Transaction
   ): Promise<SponsoredTransactionResult> => {
@@ -59,46 +63,65 @@ export function useGasSponsor() {
     }
 
     try {
-      // Serialize the transaction object itself (not built bytes)
-      const transactionBytes = toBase64(tx.serialize());
+      // STEP 1: Build transaction KIND only (no gas configuration)
+      // This is the core transaction logic without gas payment details
+      const transactionKindBytes = await tx.build({
+        client,
+        onlyTransactionKind: true,
+      });
 
-      // Send to sponsor endpoint
+      console.log('Sending transaction to sponsor...');
+
+      // STEP 2: Send transaction KIND to sponsor endpoint
       const response = await fetch('/api/sponsor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          transactionBytes,
+          transactionKindBytes: Array.from(transactionKindBytes),
           sender: currentAccount.address,
         }),
       });
 
       const data: SponsorResponse = await response.json();
 
-      if (!response.ok || !data.success || !data.signedTransaction) {
+      if (!response.ok || !data.success || !data.sponsoredTransaction) {
         console.error('Gas sponsorship failed:', data.error);
         console.log('Falling back to user-paid gas');
         return await executeWithUserGas(tx);
       }
 
-      // Now the user needs to sign the sponsored transaction
-      console.log('Executing sponsored transaction...');
-      console.log('Sponsor:', data.signedTransaction.sponsor);
+      console.log('Sponsor configured transaction:', data.sponsoredTransaction.sponsor);
 
-      // The sponsor has provided signed transaction bytes
-      // We need the user to also sign via their wallet
-      const userSignedTx = await signAndExecute({
-        transaction: tx,
-      }, {
-        onSuccess: (result) => {
-          console.log('Sponsored transaction executed:', result.digest);
+      // STEP 3: Deserialize the sponsored transaction that has gas configured
+      // The backend has already set gas owner, gas payment, and gas budget
+      const sponsoredTxBytes = fromBase64(data.sponsoredTransaction.bytes);
+      const sponsoredTx = Transaction.from(sponsoredTxBytes);
+
+      // STEP 4: User signs the sponsored transaction
+      console.log('Requesting user signature...');
+      const userSignature = await signTransaction({
+        transaction: sponsoredTx,
+      });
+
+      // STEP 5: Execute with BOTH signatures (user + sponsor)
+      console.log('Executing with dual signatures...');
+      const result = await client.executeTransactionBlock({
+        transactionBlock: userSignature.bytes,
+        signature: [userSignature.signature, data.sponsoredTransaction.signature],
+        options: {
+          showEffects: true,
+          showEvents: true,
+          showObjectChanges: true,
         },
       });
 
+      console.log('Sponsored transaction executed:', result.digest);
+
       return {
-        digest: userSignedTx.digest,
-        effects: userSignedTx.effects,
+        digest: result.digest,
+        effects: result.effects,
         sponsored: true,
       };
 
@@ -107,7 +130,7 @@ export function useGasSponsor() {
       console.log('Falling back to user-paid gas');
       return await executeWithUserGas(tx);
     }
-  }, [client, currentAccount, isSponsorshipEnabled, signAndExecute]);
+  }, [client, currentAccount, isSponsorshipEnabled, signTransaction, signAndExecute]);
 
   // Execute transaction with user's gas (fallback)
   const executeWithUserGas = async (

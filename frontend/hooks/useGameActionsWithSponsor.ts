@@ -62,17 +62,43 @@ export function useGameActionsWithSponsor() {
   ) => {
     if (!currentAccount) throw new Error('No account connected');
 
-    const tx = new Transaction();
     const lobbyId = getTierLobby(tier);
 
-    // Get user's coins and split the entry fee
+    // Get the entry fee for this tier
+    const TIER_FEES: Record<Tier, number> = {
+      1: 10_000_000,       // 0.01 OCT
+      2: 100_000_000,      // 0.1 OCT
+      3: 1_000_000_000,    // 1 OCT
+      4: 10_000_000_000,   // 10 OCT
+      5: 100_000_000_000,  // 100 OCT
+    };
+
+    const entryFee = TIER_FEES[tier];
+
+    // Get user's coins
     const coins = await client.getAllCoins({ owner: currentAccount.address });
     if (!coins.data || coins.data.length === 0) {
       throw new Error('No coins found');
     }
 
-    // Use the first coin
-    const paymentCoin = tx.object(coins.data[0].coinObjectId);
+    // Find a coin with enough balance
+    let selectedCoin = coins.data.find(coin => parseInt(coin.balance) >= entryFee);
+
+    if (!selectedCoin) {
+      // Use the largest coin if none have enough
+      selectedCoin = coins.data.reduce((largest, coin) =>
+        parseInt(coin.balance) > parseInt(largest.balance) ? coin : largest
+      );
+    }
+
+    // Build transaction with payment coin
+    const tx = new Transaction();
+
+    // Split the exact entry fee from the coin
+    const [paymentCoin] = tx.splitCoins(
+      tx.object(selectedCoin.coinObjectId),
+      [tx.pure.u64(entryFee)]
+    );
 
     tx.moveCall({
       target: `${GAME_PACKAGE_ID}::battle_royale::join_game`,
