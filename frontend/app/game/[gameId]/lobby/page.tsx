@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { useCurrentAccount } from '@mysten/dapp-kit';
 import { useGameState } from '@/hooks/useGameState';
 import { useGameActionsWithSponsor } from '@/hooks/useGameActionsWithSponsor';
+import { useGameChat } from '@/hooks/useGameChat';
+import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { TIER_NAMES, TIER_FEES, GameStatus, MAX_PLAYERS_PER_GAME } from '@/lib/constants';
 import Link from 'next/link';
 
@@ -16,6 +18,15 @@ export default function GameLobbyPage() {
 
   const { gameState, loading, error, isPlayerInGame, refetch } = useGameState(gameId);
   const { joinGame, startGame } = useGameActionsWithSponsor();
+
+  // Game chat
+  const {
+    messages,
+    loading: chatLoading,
+    error: chatError,
+    sending,
+    sendMessage,
+  } = useGameChat(gameId, currentAccount?.address);
 
   const [joining, setJoining] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -422,6 +433,18 @@ export default function GameLobbyPage() {
           <li>Gas fees are sponsored - play for free!</li>
         </ul>
       </div>
+
+      {/* Chat Drawer */}
+      <ChatDrawer
+        messages={messages}
+        currentPlayerAddress={currentAccount?.address}
+        onSendMessage={sendMessage}
+        sending={sending}
+        loading={chatLoading}
+        error={chatError}
+        title="Lobby Chat"
+        placeholder="Chat with other players..."
+      />
     </div>
   );
 }

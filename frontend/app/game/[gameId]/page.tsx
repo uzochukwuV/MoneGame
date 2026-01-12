@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { useCurrentAccount } from '@mysten/dapp-kit';
 import { useGameState } from '@/hooks/useGameState';
 import { useGameActionsWithSponsor } from '@/hooks/useGameActionsWithSponsor';
+import { useGameChat } from '@/hooks/useGameChat';
+import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { TIER_NAMES, GameStatus, QUESTION_TIME_MS, ANSWER_TIME_MS } from '@/lib/constants';
 import Link from 'next/link';
 
@@ -18,6 +20,15 @@ export default function ActiveGamePage() {
 
   const { gameState, loading, error, isPlayerInGame } = useGameState(gameId);
   const { askQuestion, submitAnswer, revealRole, useImmunity, finalizeRound, claimPrize } = useGameActionsWithSponsor();
+
+  // Game chat
+  const {
+    messages,
+    loading: chatLoading,
+    error: chatError,
+    sending,
+    sendMessage,
+  } = useGameChat(gameId, currentAccount?.address);
 
   // UI State
   const [question, setQuestion] = useState('');
@@ -771,6 +782,18 @@ export default function ActiveGamePage() {
           ))}
         </div>
       </div>
+
+      {/* Chat Drawer */}
+      <ChatDrawer
+        messages={messages}
+        currentPlayerAddress={currentAccount?.address}
+        onSendMessage={sendMessage}
+        sending={sending}
+        loading={chatLoading}
+        error={chatError}
+        title="Game Chat"
+        placeholder="Chat with players..."
+      />
     </div>
   );
 }
