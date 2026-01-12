@@ -21,6 +21,7 @@ interface GameInfo {
   maxPlayers: number;
   prizePool: string;
   creator: string;
+  players: string[];
 }
 
 export default function DiscoverPage() {
@@ -120,6 +121,7 @@ export default function DiscoverPage() {
               maxPlayers: 50,
               prizePool: fields.prize_pool?.toString() || '0',
               creator: players[0] || '',
+              players: players,
             };
           })
           .filter((game): game is GameInfo => game !== null);
@@ -394,6 +396,11 @@ function GameCard({ game, tierColor }: { game: GameInfo; tierColor: string }) {
   const isWaiting = game.status === GameStatus.WAITING;
   const prizePoolOCT = (parseInt(game.prizePool) / 1_000_000_000).toFixed(2);
 
+  // Check if current user is already in this game
+  const isPlayerInGame = currentAccount?.address
+    ? game.players.includes(currentAccount.address)
+    : false;
+
   const handleJoinGame = async (e: React.MouseEvent) => {
     e.preventDefault();
 
@@ -402,7 +409,17 @@ function GameCard({ game, tierColor }: { game: GameInfo; tierColor: string }) {
       return;
     }
 
-    // If game is already active, just view it
+    // If user is already in the game, go to lobby/game page
+    if (isPlayerInGame) {
+      if (isWaiting) {
+        router.push(`/game/${game.gameId}/lobby`);
+      } else {
+        router.push(`/game/${game.gameId}`);
+      }
+      return;
+    }
+
+    // If game is already active and user not in it, just view it
     if (!isWaiting) {
       router.push(`/game/${game.gameId}`);
       return;
@@ -510,7 +527,17 @@ function GameCard({ game, tierColor }: { game: GameInfo; tierColor: string }) {
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
-        <span>{joining ? 'Joining...' : isWaiting ? 'Join Game' : 'View Game'}</span>
+        <span>
+          {joining
+            ? 'Joining...'
+            : isPlayerInGame
+            ? isWaiting
+              ? 'Continue to Lobby'
+              : 'View Game'
+            : isWaiting
+            ? 'Join Game'
+            : 'View Game'}
+        </span>
         <span>{joining ? '⏳' : '→'}</span>
       </div>
     </div>

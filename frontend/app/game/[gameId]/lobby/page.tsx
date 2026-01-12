@@ -15,10 +15,11 @@ export default function GameLobbyPage() {
   const currentAccount = useCurrentAccount();
 
   const { gameState, loading, error, isPlayerInGame, refetch } = useGameState(gameId);
-  const { joinGame } = useGameActionsWithSponsor();
+  const { joinGame, startGame } = useGameActionsWithSponsor();
 
   const [joining, setJoining] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   // Redirect to game page when game starts
   useEffect(() => {
@@ -54,6 +55,32 @@ export default function GameLobbyPage() {
       alert('Failed to join game: ' + (error as Error).message);
     } finally {
       setJoining(false);
+    }
+  };
+
+  // Handle start game (need at least 3 players)
+  const handleStartGame = async () => {
+    if (!currentAccount?.address || !gameState) return;
+
+    if (gameState.players.length < 3) {
+      alert('Need at least 3 players to start the game!');
+      return;
+    }
+
+    try {
+      setStarting(true);
+
+      await startGame(gameId);
+
+      alert('Game started successfully!');
+
+      // The useEffect will redirect to the game page
+      await refetch();
+    } catch (error) {
+      console.error('Error starting game:', error);
+      alert('Failed to start game: ' + (error as Error).message);
+    } finally {
+      setStarting(false);
     }
   };
 
@@ -206,12 +233,16 @@ export default function GameLobbyPage() {
         </div>
         <p style={{ color: 'white', fontWeight: '600' }}>
           {gameState.status === GameStatus.WAITING
-            ? 'Waiting for players to join...'
+            ? gameState.players.length >= 3
+              ? 'Ready to start! Any player can begin the game.'
+              : 'Waiting for players to join...'
             : 'Game starting soon!'}
         </p>
         <p style={{ color: '#9ca3af', fontSize: '0.875rem', marginTop: '0.5rem' }}>
           {gameState.status === GameStatus.WAITING
-            ? `Need at least 2 players to start`
+            ? gameState.players.length >= 3
+              ? `${gameState.players.length} players ready • Click "Start Game" to begin`
+              : `Need at least 3 players to start (${gameState.players.length}/3)`
             : `Get ready!`}
         </p>
       </div>
@@ -296,7 +327,7 @@ export default function GameLobbyPage() {
       </div>
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
         {!currentAccount && (
           <div style={{
             padding: '1rem 2rem',
@@ -327,6 +358,27 @@ export default function GameLobbyPage() {
             }}
           >
             {joining ? 'Joining...' : `Join Game (${entryFeeOCT.toFixed(gameState.tier === 1 ? 2 : 0)} OCT)`}
+          </button>
+        )}
+
+        {currentAccount && isInGame && gameState.status === GameStatus.WAITING && gameState.players.length >= 3 && (
+          <button
+            onClick={handleStartGame}
+            disabled={starting}
+            style={{
+              padding: '1rem 2rem',
+              backgroundColor: starting ? '#6b7280' : '#6366f1',
+              color: 'white',
+              fontWeight: 'bold',
+              borderRadius: '0.5rem',
+              border: 'none',
+              cursor: starting ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              transition: 'all 0.2s',
+              boxShadow: '0 10px 15px -3px rgba(99, 102, 241, 0.3)'
+            }}
+          >
+            {starting ? 'Starting...' : '🚀 Start Game'}
           </button>
         )}
 
