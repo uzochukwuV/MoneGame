@@ -7,6 +7,7 @@ import { useGameState } from '@/hooks/useGameState';
 import { useGameActionsWithSponsor } from '@/hooks/useGameActionsWithSponsor';
 import { useGameChat } from '@/hooks/useGameChat';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
+import { GameSchedule } from '@/components/game/GameSchedule';
 import { TIER_NAMES, TIER_FEES, GameStatus, MAX_PLAYERS_PER_GAME } from '@/lib/constants';
 import Link from 'next/link';
 
@@ -337,8 +338,15 @@ export default function GameLobbyPage() {
         </div>
       </div>
 
+      {/* Game Schedule */}
+      <GameSchedule
+        gameId={gameId}
+        playerAddress={currentAccount?.address}
+        playerCount={gameState.players.length}
+      />
+
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '2rem' }}>
         {!currentAccount && (
           <div style={{
             padding: '1rem 2rem',

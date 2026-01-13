@@ -64,6 +64,32 @@ export type Database = {
           created_at?: string;
         };
       };
+      game_schedules: {
+        Row: {
+          id: string;
+          game_id: string;
+          proposed_time: string;
+          proposed_by: string;
+          votes: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          game_id: string;
+          proposed_time: string;
+          proposed_by: string;
+          votes?: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          game_id?: string;
+          proposed_time?: string;
+          proposed_by?: string;
+          votes?: string[];
+          created_at?: string;
+        };
+      };
     };
   };
 };

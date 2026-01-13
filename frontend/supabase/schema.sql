@@ -67,3 +67,34 @@ $$ LANGUAGE plpgsql;
 
 -- Optional: Create a cron job to run cleanup daily (requires pg_cron extension)
 -- SELECT cron.schedule('clean-old-messages', '0 0 * * *', 'SELECT clean_old_messages()');
+
+-- Game Schedules Table
+-- Stores proposed start times for games (players can vote on them)
+CREATE TABLE IF NOT EXISTS game_schedules (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  game_id TEXT NOT NULL,
+  proposed_time TIMESTAMP WITH TIME ZONE NOT NULL,
+  proposed_by TEXT NOT NULL,
+  votes TEXT[] DEFAULT ARRAY[]::TEXT[],
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_game_schedules_game_id ON game_schedules(game_id);
+CREATE INDEX IF NOT EXISTS idx_game_schedules_proposed_time ON game_schedules(proposed_time);
+
+-- Enable Row Level Security (RLS)
+ALTER TABLE game_schedules ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for game_schedules
+CREATE POLICY "Anyone can read game schedules" ON game_schedules
+  FOR SELECT USING (true);
+
+CREATE POLICY "Anyone can insert game schedules" ON game_schedules
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Anyone can update game schedules" ON game_schedules
+  FOR UPDATE USING (true);
+
+-- Enable Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE game_schedules;
