@@ -1,11 +1,8 @@
+import { CLOCK_OBJECT, GAME_PACKAGE_ID, ITEM_SHOP_ID } from '@/lib/constants';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { useCallback } from 'react';
 
-// Your deployed contract IDs
-const GAME_PACKAGE_ID = '0x18a05df19f0a609ff47c6cc4fbddc558bb9097e7a757b769d412659b696bb879';
-const ITEM_SHOP_ID = '0x7581b5762c79b821df47482bef07a3c7f3cc08f101c804fcfcb1271d88621856';
-const CLOCK_OBJECT = '0x6';
 
 // Item pricing (from items.move)
 const BASE_IMMUNITY_PRICE = 100_000_000; // 0.1 OCT in MIST

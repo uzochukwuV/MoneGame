@@ -1,8 +1,6 @@
 import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { useCallback } from 'react';
 
-// Your deployed contract IDs
-const GAME_PACKAGE_ID = '0x18a05df19f0a609ff47c6cc4fbddc558bb9097e7a757b769d412659b696bb879';
 
 // Role constants (from role_machine.move)
 const ROLE_CITIZEN = 1;

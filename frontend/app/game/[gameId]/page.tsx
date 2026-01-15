@@ -2,12 +2,12 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useCurrentAccount } from '@mysten/dapp-kit';
+import { useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { useGameState } from '@/hooks/useGameState';
 import { useGameActionsWithSponsor } from '@/hooks/useGameActionsWithSponsor';
 import { useGameChat } from '@/hooks/useGameChat';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
-import { TIER_NAMES, GameStatus, QUESTION_TIME_MS, ANSWER_TIME_MS } from '@/lib/constants';
+import { TIER_NAMES, GameStatus, QUESTION_TIME_MS, ANSWER_TIME_MS, GAME_PACKAGE_ID } from '@/lib/constants';
 import Link from 'next/link';
 
 type GamePhase = 'question' | 'answer' | 'finalization' | 'finished';
@@ -17,6 +17,7 @@ export default function ActiveGamePage() {
   const router = useRouter();
   const gameId = params.gameId as string;
   const currentAccount = useCurrentAccount();
+  const client = useSuiClient();
 
   const { gameState, loading, error, isPlayerInGame } = useGameState(gameId);
   const { askQuestion, submitAnswer, revealRole, useImmunity, finalizeRound, claimPrize } = useGameActionsWithSponsor();
@@ -44,6 +45,15 @@ export default function ActiveGamePage() {
   const [playerRole, setPlayerRole] = useState<'citizen' | 'saboteur' | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(0);
+  const [lastRoundResults, setLastRoundResults] = useState<{
+    voteCountA: number;
+    voteCountB: number;
+    voteCountC: number;
+    eliminatedCount: number;
+    newlyEliminated: string[];
+  } | null>(null);
+  const [previousRound, setPreviousRound] = useState<number>(0);
+  const [previousEliminated, setPreviousEliminated] = useState<string[]>([]);
 
   // Redirect if game is waiting (should be in lobby)
   useEffect(() => {
@@ -52,13 +62,91 @@ export default function ActiveGamePage() {
     }
   }, [gameState?.status, gameId, router]);
 
+  // Detect round changes and track eliminations
+  useEffect(() => {
+    if (!gameState) return;
+
+    const currentEliminated = gameState.players.filter(p => !p.isAlive).map(p => p.address);
+
+    // If round changed or new eliminations detected
+    if (gameState.currentRound !== previousRound && previousRound > 0) {
+      // Round changed - compute who was newly eliminated
+      const newlyEliminated = currentEliminated.filter(addr => !previousEliminated.includes(addr));
+
+      if (newlyEliminated.length > 0 || previousEliminated.length !== currentEliminated.length) {
+        // Fetch vote results from the last round
+        fetchVoteResults(newlyEliminated);
+      }
+    }
+
+    // Update tracking state
+    setPreviousRound(gameState.currentRound);
+    setPreviousEliminated(currentEliminated);
+  }, [gameState, previousRound, previousEliminated]);
+
+  // Function to fetch vote results
+  const fetchVoteResults = async (newlyEliminated: string[]) => {
+    try {
+      // Query RoundFinalized events for this game
+      const events = await client.queryEvents({
+        query: {
+          MoveEventType: `${GAME_PACKAGE_ID}::battle_royale::RoundFinalized`,
+        } as any,
+        limit: 10,
+        order: 'descending',
+      });
+
+      // Find the most recent event for this game
+      const gameEvent = events.data.find((event: any) => {
+        const data = event.parsedJson as any;
+        return data?.game_id === gameId;
+      });
+
+      if (gameEvent) {
+        const data = gameEvent.parsedJson as any;
+
+        // Since the smart contract doesn't emit vote counts in the event,
+        // we'll need to infer them or show a simplified version
+        // For now, we'll just show the eliminated players
+        setLastRoundResults({
+          voteCountA: 0, // We don't have this data from events
+          voteCountB: 0,
+          voteCountC: 0,
+          eliminatedCount: data.eliminated_count || newlyEliminated.length,
+          newlyEliminated: newlyEliminated,
+        });
+      } else {
+        // Fallback if no event found
+        setLastRoundResults({
+          voteCountA: 0,
+          voteCountB: 0,
+          voteCountC: 0,
+          eliminatedCount: newlyEliminated.length,
+          newlyEliminated: newlyEliminated,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching vote results:', error);
+      // Still show eliminated players even if event fetch fails
+      setLastRoundResults({
+        voteCountA: 0,
+        voteCountB: 0,
+        voteCountC: 0,
+        eliminatedCount: newlyEliminated.length,
+        newlyEliminated: newlyEliminated,
+      });
+    }
+  };
+
   // Calculate time remaining
   useEffect(() => {
     if (!gameState) return;
 
     const interval = setInterval(() => {
       const now = Date.now();
-      const deadline = gameState.questionDeadline || gameState.answerDeadline || 0;
+      // Only show timer if question has been asked (answer phase)
+      // During question phase, don't show countdown
+      const deadline = gameState.currentQuestion ? gameState.answerDeadline || 0 : 0;
       const remaining = Math.max(0, deadline - now);
       setTimeRemaining(remaining);
     }, 100);
@@ -150,11 +238,27 @@ export default function ActiveGamePage() {
 
   // Handle finalize round
   const handleFinalizeRound = async () => {
+    if (!gameState) return;
+
     try {
       setFinalizing(true);
+
+      // Store eliminated players before finalization
+      const eliminatedBefore = [...gameState.players.filter(p => !p.isAlive).map(p => p.address)];
+
+      // Finalize the round
       await finalizeRound(gameId);
+
+      // Wait a bit for the transaction to complete and state to update
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Fetch updated game state to see new eliminations
+      // The gameState will auto-update via polling, but we can force a check
+      // For now, we'll show a simple success message
+      // The results will be shown when RoundFinalized event is detected
+
       setHasAnswered(false); // Reset for next round
-      alert('Round finalized! Check the results.');
+      alert('Round finalized! Check the results below.');
     } catch (error) {
       console.error('Error finalizing round:', error);
       alert('Failed to finalize round: ' + (error as Error).message);
@@ -287,7 +391,7 @@ export default function ActiveGamePage() {
               Time Left
             </div>
             <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: timeRemaining < 30000 ? '#ef4444' : 'white' }}>
-              {formatTime(timeRemaining)}
+              {gameState.currentQuestion ? formatTime(timeRemaining) : '−:−−'}
             </div>
           </div>
         </div>
@@ -514,7 +618,7 @@ export default function ActiveGamePage() {
       )}
 
       {/* PHASE: Answer Phase */}
-      {currentPhase === 'answer' && !isEliminated && gameState.currentQuestion && (
+      {currentPhase === 'answer' && gameState.currentQuestion && (
         <div style={{
           backgroundColor: 'rgba(16, 185, 129, 0.05)',
           border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -528,7 +632,7 @@ export default function ActiveGamePage() {
               Answer Phase
             </h2>
             <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
-              Vote with the majority to survive! Minority votes are eliminated.
+              {isEliminated ? 'You are eliminated and cannot vote.' : 'Vote with the majority to survive! Minority votes are eliminated.'}
             </p>
           </div>
 
@@ -550,7 +654,7 @@ export default function ActiveGamePage() {
             </div>
 
             {/* Answer Options */}
-            {!hasAnswered ? (
+            {!hasAnswered && !isEliminated ? (
               <>
                 <div style={{ display: 'grid', gap: '1rem', marginBottom: '2rem' }}>
                   {[
@@ -561,6 +665,7 @@ export default function ActiveGamePage() {
                     <button
                       key={option.value}
                       onClick={() => setPlayerAnswer(option.value as 1 | 2 | 3)}
+                      disabled={isEliminated}
                       style={{
                         padding: '1.5rem',
                         backgroundColor: playerAnswer === option.value ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
@@ -568,8 +673,9 @@ export default function ActiveGamePage() {
                         borderRadius: '0.75rem',
                         color: 'white',
                         textAlign: 'left',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s'
+                        cursor: isEliminated ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        opacity: isEliminated ? 0.5 : 1
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -595,23 +701,23 @@ export default function ActiveGamePage() {
 
                 <button
                   onClick={handleSubmitAnswer}
-                  disabled={submitting}
+                  disabled={submitting || isEliminated}
                   style={{
                     width: '100%',
                     padding: '1rem',
-                    backgroundColor: submitting ? '#6b7280' : '#10b981',
+                    backgroundColor: submitting || isEliminated ? '#6b7280' : '#10b981',
                     color: 'black',
                     fontWeight: 'bold',
                     borderRadius: '0.5rem',
                     border: 'none',
-                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    cursor: submitting || isEliminated ? 'not-allowed' : 'pointer',
                     fontSize: '1rem'
                   }}
                 >
-                  {submitting ? 'Submitting Answer...' : 'Submit Answer'}
+                  {submitting ? 'Submitting Answer...' : isEliminated ? 'You Cannot Vote (Eliminated)' : 'Submit Answer'}
                 </button>
               </>
-            ) : (
+            ) : !isEliminated ? (
               <div style={{
                 backgroundColor: 'rgba(16, 185, 129, 0.1)',
                 border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -625,6 +731,22 @@ export default function ActiveGamePage() {
                 </h3>
                 <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
                   Waiting for other players to vote...
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '0.75rem',
+                padding: '2rem',
+                textAlign: 'center'
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👻</div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#ef4444', marginBottom: '0.5rem' }}>
+                  You Are Eliminated
+                </h3>
+                <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>
+                  You can watch the game but cannot vote.
                 </p>
               </div>
             )}
@@ -665,6 +787,109 @@ export default function ActiveGamePage() {
           >
             {finalizing ? 'Finalizing Round...' : 'Finalize Round & See Results'}
           </button>
+        </div>
+      )}
+
+      {/* Last Round Results Display */}
+      {lastRoundResults && (
+        <div style={{
+          backgroundColor: 'rgba(139, 92, 246, 0.05)',
+          border: '1px solid rgba(139, 92, 246, 0.3)',
+          borderRadius: '0.75rem',
+          padding: '2rem',
+          marginBottom: '2rem'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📊</div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'white', marginBottom: '0.5rem' }}>
+              Last Round Results
+            </h3>
+          </div>
+
+          {/* Vote Results - Only show if we have vote data */}
+          {(lastRoundResults.voteCountA > 0 || lastRoundResults.voteCountB > 0 || lastRoundResults.voteCountC > 0) && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#9ca3af', marginBottom: '1rem', textTransform: 'uppercase' }}>
+                Vote Distribution
+              </h4>
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                <div style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ color: 'white', fontWeight: '600' }}>Option A</span>
+                  <span style={{ color: '#10b981', fontSize: '1.125rem', fontWeight: 'bold' }}>{lastRoundResults.voteCountA} votes</span>
+                </div>
+                <div style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ color: 'white', fontWeight: '600' }}>Option B</span>
+                  <span style={{ color: '#10b981', fontSize: '1.125rem', fontWeight: 'bold' }}>{lastRoundResults.voteCountB} votes</span>
+                </div>
+                <div style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '0.5rem',
+                  padding: '1rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ color: 'white', fontWeight: '600' }}>Option C</span>
+                  <span style={{ color: '#10b981', fontSize: '1.125rem', fontWeight: 'bold' }}>{lastRoundResults.voteCountC} votes</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Eliminated Players */}
+          {lastRoundResults.eliminatedCount > 0 && (
+            <div>
+              <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#9ca3af', marginBottom: '1rem', textTransform: 'uppercase' }}>
+                Eliminated Players ({lastRoundResults.eliminatedCount})
+              </h4>
+              <div style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '0.5rem',
+                padding: '1rem'
+              }}>
+                <div style={{ display: 'grid', gap: '0.5rem' }}>
+                  {lastRoundResults.newlyEliminated.map((addr) => (
+                    <div key={addr} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '1rem' }}>💀</span>
+                      <span style={{ fontFamily: 'monospace', fontSize: '0.875rem', color: '#ef4444' }}>
+                        {addr.slice(0, 6)}...{addr.slice(-4)}
+                      </span>
+                      {addr === currentAccount?.address && (
+                        <span style={{
+                          padding: '0.125rem 0.375rem',
+                          backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                          color: '#ef4444',
+                          borderRadius: '0.25rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '600'
+                        }}>
+                          You
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

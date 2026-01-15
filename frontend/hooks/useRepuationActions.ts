@@ -1,10 +1,8 @@
+import { BADGE_REGISTRY_ID, GAME_PACKAGE_ID } from '@/lib/constants';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { useCallback } from 'react';
 
-// Your deployed contract IDs
-const GAME_PACKAGE_ID = '0x18a05df19f0a609ff47c6cc4fbddc558bb9097e7a757b769d412659b696bb879';
-const BADGE_REGISTRY_ID = '0x7824cb0f993210206d0eaf4c8b1ef1cfa2f6532275b3172e9aaeade314e9d43d';
 
 // Reputation level constants (from reputation.move)
 const LEVEL_BRONZE = 1;
