@@ -54,6 +54,7 @@ export default function ActiveGamePage() {
   } | null>(null);
   const [previousRound, setPreviousRound] = useState<number>(0);
   const [previousEliminated, setPreviousEliminated] = useState<string[]>([]);
+  const [gamePhaseInfo, setGamePhaseInfo] = useState<'saboteur_hunt' | 'citizen_reduction' | null>(null);
 
   // Redirect if game is waiting (should be in lobby)
   useEffect(() => {
@@ -61,6 +62,28 @@ export default function ActiveGamePage() {
       router.push(`/game/${gameId}/lobby`);
     }
   }, [gameState?.status, gameId, router]);
+
+  // Detect game phase (Saboteur Hunt vs Citizen Reduction)
+  useEffect(() => {
+    if (!gameState || gameState.status !== GameStatus.ACTIVE) {
+      setGamePhaseInfo(null);
+      return;
+    }
+
+    const alivePlayers = gameState.players.filter(p => p.isAlive);
+
+    // We can't directly know roles from the frontend, but we can infer the phase
+    // If we have the player's role revealed, we could make a better determination
+    // For now, we'll check based on events or just show generic phase info
+
+    // Simple heuristic: If 3+ survivors and game is active, could be either phase
+    // We'll default to saboteur hunt unless we have evidence otherwise
+    if (alivePlayers.length >= 3) {
+      setGamePhaseInfo('saboteur_hunt'); // Default assumption
+    } else {
+      setGamePhaseInfo('citizen_reduction'); // With ≤2 players, likely final phase
+    }
+  }, [gameState]);
 
   // Detect round changes and track eliminations
   useEffect(() => {
@@ -396,6 +419,53 @@ export default function ActiveGamePage() {
           </div>
         </div>
       </div>
+
+      {/* Game Phase Info Banner */}
+      {gameState.status === GameStatus.ACTIVE && alivePlayers.length > 2 && (
+        <div style={{
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          borderRadius: '0.75rem',
+          padding: '1rem 1.5rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem'
+        }}>
+          <div style={{ fontSize: '1.5rem' }}>🎯</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.875rem', fontWeight: 'bold', color: '#3b82f6', marginBottom: '0.25rem' }}>
+              PHASE 1: SABOTEUR HUNT
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+              Work together to identify and eliminate saboteurs. Vote with the majority to survive!
+            </div>
+          </div>
+        </div>
+      )}
+
+      {gameState.status === GameStatus.ACTIVE && alivePlayers.length === 2 && (
+        <div style={{
+          backgroundColor: 'rgba(251, 191, 36, 0.1)',
+          border: '1px solid rgba(251, 191, 36, 0.3)',
+          borderRadius: '0.75rem',
+          padding: '1rem 1.5rem',
+          marginBottom: '1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem'
+        }}>
+          <div style={{ fontSize: '1.5rem' }}>👥</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.875rem', fontWeight: 'bold', color: '#fbbf24', marginBottom: '0.25rem' }}>
+              FINAL ROUND: 2 SURVIVORS
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
+              You both survived! The game will end and you'll share the prize pool.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Role & Actions Bar */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>

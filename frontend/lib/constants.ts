@@ -2,20 +2,20 @@
 export const SUI_NETWORK = process.env.NEXT_PUBLIC_SUI_NETWORK || 'testnet';
 
 // Smart Contract Package ID (OneChain Deployed)
-export const GAME_PACKAGE_ID = process.env.NEXT_PUBLIC_GAME_PACKAGE_ID || '0x18a05df19f0a609ff47c6cc4fbddc558bb9097e7a757b769d412659b696bb879';
+export const GAME_PACKAGE_ID = process.env.NEXT_PUBLIC_GAME_PACKAGE_ID || '0xe5dab0e0ea1bd57bc52b2b3e9de99e157e028fc35f8fb86429484172010d6b46';
 
 // Deployed Shared Objects
-export const BADGE_REGISTRY_ID = '0x7824cb0f993210206d0eaf4c8b1ef1cfa2f6532275b3172e9aaeade314e9d43d';
-export const ITEM_SHOP_ID = '0x7581b5762c79b821df47482bef07a3c7f3cc08f101c804fcfcb1271d88621856';
-export const PLATFORM_TREASURY_ID = '0x355955adda97ff6bd60bc8f3b2ec221076aaa396b9473558f41314b7badc7503';
+export const BADGE_REGISTRY_ID = '0xa21775be2f92a7a455a44eae23f3a5ebc7d0bc7311831a4d8c3b6c6630fd2904';
+export const ITEM_SHOP_ID = '0x35223674cde35e9d8ef90c725fb560da2a41f370439f6f794c4eda43e96293c8';
+export const PLATFORM_TREASURY_ID = '0xea8e0485905f64d4d8c7350138442d3213d4c4c5dfda755fb994b08738e0b4ce';
 
 // Tier Lobby IDs (OneChain) - fetched from TierLobbyCreated events
 export const TIER_LOBBY_IDS: Record<number, string> = {
-  1: '0x6a07b6cdfb6a6a520153fedc7d4adf3227ec5becaf67d7eef175c93423872e3d',
-  2: '0x25224aa39be813d68d756b4616121c81b80f19e1a9034fda5771886fa043d076',
-  3: '0x10fa30fbc9ac4eaf63dfa50e17104f338129acdd998fd03415cf90bdc624f7e0',
-  4: '0xaa7574baf0736eaf5be39319eb88858cc0884850b184f17441ca4fecb92cdc73',
-  5: '0x999914fbf4720489b3909904ff5a819dde1d3e2c640d73029902cb476bf88009',
+  1: '0x14758175d4e9321accde6c0e0fbe64d426729bcd862bf4948b89a37abdc01404',
+  2: '0xcff37aa9df273b140f033fa7d48ed1433a232d572e90bfb06794917fc15d25ea',
+  3: '0x45ed6c095f2fcfdb0eb8885a5c521ae3388d46d54f9a15a8127598ec92b9c2dd',
+  4: '0x78597617c802c557b6e4888e90718e55533b576dac076d0cf405349569a500a2',
+  5: '0xd8a53952e0e53230941108a258daf413a7eb2deb940a7f72b6023c1c6b4ebb44',
 };
 
 // Sui Clock Object (shared object at 0x6)
@@ -29,10 +29,10 @@ export const RPC_ENDPOINTS = {
 
 // Game Constants (from smart contract)
 export const MAX_PLAYERS_PER_GAME = 50;
-export const MIN_PLAYERS_TO_START = 2;
+export const MIN_PLAYERS_TO_START = 4; // Updated to match contract
 export const MAX_ROUNDS = 3;
 export const QUESTION_TIME_MS = 120_000; // 2 minutes
-export const ANSWER_TIME_MS = 60_000; // 1 minute
+export const ANSWER_TIME_MS = 150_000; // 2.5 minutes (updated from contract)
 
 // Tier Configuration
 export enum Tier {
