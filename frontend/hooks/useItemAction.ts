@@ -1,4 +1,4 @@
-import { CLOCK_OBJECT, GAME_PACKAGE_ID, ITEM_SHOP_ID } from '@/lib/constants';
+import { CLOCK_OBJECT, GAME_PACKAGE_ID, ITEM_SHOP_ID, TOKEN_SYMBOL } from '@/lib/constants';
 import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from '@mysten/dapp-kit';
 import { Transaction } from '@mysten/sui/transactions';
 import { useCallback } from 'react';
@@ -220,10 +220,10 @@ export function useItemActions() {
     }
   }, [client, getItemShop]);
 
-  // Format price in OCT (convert from MIST)
+  // Format price in tokens (convert from MIST)
   const formatPrice = useCallback((priceInMist: number): string => {
-    const priceInOct = priceInMist / 1_000_000_000;
-    return `${priceInOct.toFixed(2)} OCT`;
+    const priceInTokens = priceInMist / 1_000_000_000;
+    return `${priceInTokens.toFixed(2)} ${TOKEN_SYMBOL}`;
   }, []);
 
   // Get price breakdown for all tiers

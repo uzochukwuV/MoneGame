@@ -9,7 +9,9 @@ import {
   TIER_LOBBY_IDS,
   PLATFORM_TREASURY_ID,
   BADGE_REGISTRY_ID,
-  ITEM_SHOP_ID
+  ITEM_SHOP_ID,
+  HACKATHON_COIN_TYPE,
+  TOKEN_SYMBOL
 } from '@/lib/constants';
 import type { GameData } from '@/types/game';
 
@@ -140,13 +142,14 @@ export function useGameActions(): UseGameActionsReturn {
       const lobbyId = await getTierLobby(tier);
       const treasuryId = await getPlatformTreasury();
 
-      // Get user's coins
-      const coins = await suiClient.getAllCoins({
+      // Get user's HACKATHON coins
+      const coins = await suiClient.getCoins({
         owner: userAddress,
+        coinType: HACKATHON_COIN_TYPE,
       });
 
       if (!coins.data || coins.data.length === 0) {
-        throw new Error('No coins found. Please ensure you have OCT in your wallet.');
+        throw new Error(`No ${TOKEN_SYMBOL} tokens found. Please ensure you have ${TOKEN_SYMBOL} in your wallet.`);
       }
 
       const entryFeeMIST = TIER_FEES[tier];
@@ -159,10 +162,10 @@ export function useGameActions(): UseGameActionsReturn {
       const totalNeededMIST = BigInt(entryFeeMIST) + BigInt(10_000_000); // entry + gas
 
       if (gasBalance < totalNeededMIST) {
-        const availableOCT = Number(gasBalance) / 1_000_000_000;
-        const neededOCT = Number(totalNeededMIST) / 1_000_000_000;
+        const availableTokens = Number(gasBalance) / 1_000_000_000;
+        const neededTokens = Number(totalNeededMIST) / 1_000_000_000;
         throw new Error(
-          `Insufficient balance. Have ${availableOCT.toFixed(4)} OCT, need ${neededOCT.toFixed(4)} OCT`
+          `Insufficient balance. Have ${availableTokens.toFixed(4)} ${TOKEN_SYMBOL}, need ${neededTokens.toFixed(4)} ${TOKEN_SYMBOL}`
         );
       }
 

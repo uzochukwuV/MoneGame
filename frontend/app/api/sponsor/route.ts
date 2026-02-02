@@ -3,6 +3,7 @@ import { Transaction } from '@mysten/sui/transactions';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 import { fromBase64 } from '@mysten/sui/utils';
 import { getSuiClient } from '@/lib/suiClient';
+import { TOKEN_SYMBOL } from '@/lib/constants';
 
 /**
  * Gas Sponsorship API Route
@@ -145,7 +146,7 @@ export async function GET() {
       sponsor: sponsorAddress,
       balance: {
         total: balance.totalBalance,
-        formatted: `${Number(balance.totalBalance) / 1_000_000_000} OCT`,
+        formatted: `${Number(balance.totalBalance) / 1_000_000_000} ${TOKEN_SYMBOL}`,
       },
       timestamp: new Date().toISOString(),
     });

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TIER_NAMES, TIER_FEES, Tier } from "@/lib/constants";
+import { TIER_NAMES, TIER_FEES, Tier, TOKEN_SYMBOL } from "@/lib/constants";
 
 export default function Home() {
   const tiers = [
@@ -110,7 +110,7 @@ export default function Home() {
                 <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color }}>
                   {(TIER_FEES[tier] / 1_000_000_000).toFixed(tier === Tier.TIER_1 ? 2 : 0)}
                 </span>
-                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>OCT</span>
+                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>{TOKEN_SYMBOL}</span>
               </div>
             </Link>
           ))}
@@ -183,7 +183,7 @@ export default function Home() {
               890
             </div>
             <div style={{ fontSize: '0.875rem', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              OCT in Prizes
+              {TOKEN_SYMBOL} in Prizes
             </div>
           </div>
         </div>

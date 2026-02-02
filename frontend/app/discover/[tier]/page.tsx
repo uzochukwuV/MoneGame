@@ -9,7 +9,9 @@ import {
   TIER_FEES,
   GAME_PACKAGE_ID,
   GameStatus,
-  Tier
+  Tier,
+  HACKATHON_COIN_TYPE,
+  TOKEN_SYMBOL
 } from '@/lib/constants';
 import { useGameActionsWithSponsor } from '@/hooks/useGameActionsWithSponsor';
 
@@ -155,13 +157,16 @@ export default function DiscoverPage() {
       setCreating(true);
 
       const entryFee = TIER_FEES[tier];
-      const entryFeeOCT = entryFee / 1_000_000_000;
+      const entryFeeTokens = entryFee / 1_000_000_000;
 
-      // Get user's coins
-      const coins = await client.getAllCoins({ owner: currentAccount.address });
+      // Get user's HACKATHON coins
+      const coins = await client.getCoins({
+        owner: currentAccount.address,
+        coinType: HACKATHON_COIN_TYPE,
+      });
 
       if (!coins.data || coins.data.length === 0) {
-        alert('No coins found in wallet. Please get some OCT tokens first.');
+        alert(`No ${TOKEN_SYMBOL} tokens found in wallet. Please get some ${TOKEN_SYMBOL} tokens first.`);
         return;
       }
 
@@ -169,7 +174,7 @@ export default function DiscoverPage() {
       const totalBalance = coins.data.reduce((sum, coin) => sum + parseInt(coin.balance), 0);
 
       if (totalBalance < entryFee) {
-        alert(`Insufficient balance. You have ${(totalBalance / 1_000_000_000).toFixed(4)} OCT, need ${entryFeeOCT.toFixed(tier === 1 ? 2 : 0)} OCT`);
+        alert(`Insufficient balance. You have ${(totalBalance / 1_000_000_000).toFixed(4)} ${TOKEN_SYMBOL}, need ${entryFeeTokens.toFixed(tier === 1 ? 2 : 0)} ${TOKEN_SYMBOL}`);
         return;
       }
 
@@ -183,7 +188,7 @@ export default function DiscoverPage() {
         );
 
         console.warn('No single coin has enough balance. Using largest coin:', paymentCoin.balance);
-        alert(`Warning: Your largest coin has ${(parseInt(paymentCoin.balance) / 1_000_000_000).toFixed(4)} OCT. You may need to merge coins first. Attempting anyway...`);
+        alert(`Warning: Your largest coin has ${(parseInt(paymentCoin.balance) / 1_000_000_000).toFixed(4)} ${TOKEN_SYMBOL}. You may need to merge coins first. Attempting anyway...`);
       }
 
       console.log('Creating game in tier:', tier);
@@ -245,7 +250,7 @@ export default function DiscoverPage() {
             </h1>
             <p style={{ color: '#9ca3af', fontSize: '1rem' }}>
               Entry Fee: <span style={{ color: tierColor, fontWeight: 'bold' }}>
-                {(TIER_FEES[tier] / 1_000_000_000).toFixed(tier === 1 ? 2 : 0)} OCT
+                {(TIER_FEES[tier] / 1_000_000_000).toFixed(tier === 1 ? 2 : 0)} {TOKEN_SYMBOL}
               </span>
             </p>
           </div>
@@ -394,7 +399,7 @@ function GameCard({ game, tierColor }: { game: GameInfo; tierColor: string }) {
   const [joining, setJoining] = useState(false);
 
   const isWaiting = game.status === GameStatus.WAITING;
-  const prizePoolOCT = (parseInt(game.prizePool) / 1_000_000_000).toFixed(2);
+  const prizePoolTokens = (parseInt(game.prizePool) / 1_000_000_000).toFixed(2);
 
   // Check if current user is already in this game
   const isPlayerInGame = currentAccount?.address
@@ -496,7 +501,7 @@ function GameCard({ game, tierColor }: { game: GameInfo; tierColor: string }) {
         }}>
           <span style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Prize Pool</span>
           <span style={{ color: tierColor, fontWeight: 'bold', fontSize: '1.125rem' }}>
-            {prizePoolOCT} OCT
+            {prizePoolTokens} {TOKEN_SYMBOL}
           </span>
         </div>
       </div>

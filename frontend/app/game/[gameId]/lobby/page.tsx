@@ -8,7 +8,7 @@ import { useGameActionsWithSponsor } from '@/hooks/useGameActionsWithSponsor';
 import { useGameChat } from '@/hooks/useGameChat';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { GameSchedule } from '@/components/game/GameSchedule';
-import { TIER_NAMES, TIER_FEES, GameStatus, MAX_PLAYERS_PER_GAME } from '@/lib/constants';
+import { TIER_NAMES, TIER_FEES, GameStatus, MAX_PLAYERS_PER_GAME, TOKEN_SYMBOL } from '@/lib/constants';
 import Link from 'next/link';
 
 export default function GameLobbyPage() {
@@ -161,8 +161,8 @@ export default function GameLobbyPage() {
   const isInGame = isPlayerInGame();
   const canJoin = !isInGame && gameState.players.length < MAX_PLAYERS_PER_GAME;
   const entryFee = TIER_FEES[gameState.tier as keyof typeof TIER_FEES];
-  const entryFeeOCT = entryFee / 1_000_000_000;
-  const prizePoolOCT = (parseInt(gameState.prizePool) / 1_000_000_000).toFixed(2);
+  const entryFeeTokens = entryFee / 1_000_000_000;
+  const prizePoolTokens = (parseInt(gameState.prizePool) / 1_000_000_000).toFixed(2);
 
   return (
     <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '2rem' }}>
@@ -208,7 +208,7 @@ export default function GameLobbyPage() {
                 Entry Fee
               </div>
               <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10b981' }}>
-                {entryFeeOCT.toFixed(gameState.tier === 1 ? 2 : 0)} OCT
+                {entryFeeTokens.toFixed(gameState.tier === 1 ? 2 : 0)} {TOKEN_SYMBOL}
               </div>
             </div>
             <div>
@@ -216,7 +216,7 @@ export default function GameLobbyPage() {
                 Prize Pool
               </div>
               <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f59e0b' }}>
-                {prizePoolOCT} OCT
+                {prizePoolTokens} {TOKEN_SYMBOL}
               </div>
             </div>
             <div>
@@ -376,7 +376,7 @@ export default function GameLobbyPage() {
               transition: 'all 0.2s'
             }}
           >
-            {joining ? 'Joining...' : `Join Game (${entryFeeOCT.toFixed(gameState.tier === 1 ? 2 : 0)} OCT)`}
+            {joining ? 'Joining...' : `Join Game (${entryFeeTokens.toFixed(gameState.tier === 1 ? 2 : 0)} ${TOKEN_SYMBOL})`}
           </button>
         )}
 

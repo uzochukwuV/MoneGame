@@ -3,6 +3,7 @@
 import { ConnectButton, useCurrentAccount, useSuiClient } from '@mysten/dapp-kit';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { HACKATHON_COIN_TYPE, TOKEN_SYMBOL } from '@/lib/constants';
 
 export function Header() {
   const currentAccount = useCurrentAccount();
@@ -19,7 +20,11 @@ export function Header() {
 
       setIsLoadingBalance(true);
       try {
-        const coins = await suiClient.getAllCoins({ owner: currentAccount.address });
+        // Query specifically for HACKATHON tokens
+        const coins = await suiClient.getCoins({
+          owner: currentAccount.address,
+          coinType: HACKATHON_COIN_TYPE,
+        });
 
         if (coins.data && coins.data.length > 0) {
           const totalBalance = coins.data.reduce((sum, coin) => {
@@ -27,8 +32,8 @@ export function Header() {
             return sum + amount;
           }, 0);
 
-          const balanceInOCT = totalBalance / 1_000_000_000;
-          setBalance(balanceInOCT);
+          const balanceInToken = totalBalance / 1_000_000_000;
+          setBalance(balanceInToken);
         } else {
           setBalance(0);
         }
@@ -108,7 +113,7 @@ export function Header() {
                   {isLoadingBalance ? (
                     <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
                   ) : (
-                    `${balance.toFixed(2)} OCT`
+                    `${balance.toFixed(2)} ${TOKEN_SYMBOL}`
                   )}
                 </span>
               </div>

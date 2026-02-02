@@ -7,7 +7,7 @@ import { useGameState } from '@/hooks/useGameState';
 import { useGameActionsWithSponsor } from '@/hooks/useGameActionsWithSponsor';
 import { useGameChat } from '@/hooks/useGameChat';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
-import { TIER_NAMES, GameStatus, QUESTION_TIME_MS, ANSWER_TIME_MS, GAME_PACKAGE_ID } from '@/lib/constants';
+import { TIER_NAMES, GameStatus, QUESTION_TIME_MS, ANSWER_TIME_MS, GAME_PACKAGE_ID, TOKEN_SYMBOL } from '@/lib/constants';
 import Link from 'next/link';
 
 type GamePhase = 'question' | 'answer' | 'finalization' | 'finished';
@@ -350,7 +350,7 @@ export default function ActiveGamePage() {
   }
 
   const alivePlayers = gameState.players.filter(p => p.isAlive);
-  const prizePoolOCT = (parseInt(gameState.prizePool) / 1_000_000_000).toFixed(2);
+  const prizePoolTokens = (parseInt(gameState.prizePool) / 1_000_000_000).toFixed(2);
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '2rem' }}>
@@ -406,7 +406,7 @@ export default function ActiveGamePage() {
               Prize Pool
             </div>
             <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#f59e0b' }}>
-              {prizePoolOCT} OCT
+              {prizePoolTokens} {TOKEN_SYMBOL}
             </div>
           </div>
           <div>
